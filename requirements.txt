@@ -1,0 +1,7 @@
+opencv-python
+onnxruntime
+bytetracker
+loguru
+PyYAML
+numpy
+Pillow
