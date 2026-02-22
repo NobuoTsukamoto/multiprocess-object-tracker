@@ -1,7 +1,7 @@
+numpy
 opencv-python
 onnxruntime
-bytetracker
+supervision
 loguru
 PyYAML
-numpy
 Pillow

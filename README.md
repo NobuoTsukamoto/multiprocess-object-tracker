@@ -17,15 +17,15 @@
 - カメラのキャプチャ画像を表示します。
   - 物体検出・追跡の結果を画像にオーバーレイします。
 - 物体追跡のIDをリスト表示します（IDとクラス）。
-  - TrackListModelから取得したリストを最大10行まで表示します。
+  - 受信したリストを最大10行まで表示します。
   - 物体検出・追跡が10以上の場合、リストの10行目を"..."と表示します。
 - 物体検出・追跡の1フレームあたりの処理時間（ミリ秒）、平均フレームレートを表示します。
-  - 表示内容: xx.xx ms, xx.xx FPX
+  - 表示内容: xx.xx ms, xx.xx FPS
   - 小数点第2桁までを表示します。
   - フレームレートは最大、過去100フレーム分の平均とします。
 - カメラキャプチャ画像を画面の左側に、処理時間・フレームレートと追跡のリストを画面の右側に表示します。
 - GUIは`tkinter`を使用します。
-- CameraController、ObjectTrackingControllerと連携し、ConfigManager, Logger, TrackListModelを参照します。
+- CameraController、ObjectTrackingControllerと連携し、ConfigManager, Loggerを参照します。
 
 ### CameraController
 - カメラはWEBカメラ(UVCカメラ)をサポートします。
@@ -35,10 +35,10 @@
 - ConfigManager, Loggerを参照します。
 
 ### ObjectTrackingController
-- `onnxruntime` + `bytetrack`で物体検出・追跡を行います。
+- `onnxruntime` + `supervision`で物体検出・追跡を行います。
   - 追跡するクラスは指定可能とします。
-- CameraControllerから画像(FrameData)を取得し、物体検出(DetectionResult)・追跡(TrackInfo)に利用します。
-- 物体検出・追跡した結果(DetectionResult, TrackInfo)をTrackListModelに保持します。
+- CameraControllerから画像(FrameData)を取得し、物体検出・追跡(TrackInfo, sv.Detections)を行います。
+- 追跡結果をGUIControllerに送信します。
 - ConfigManager, Loggerを参照します。
 
 ### ConfigManager
@@ -48,10 +48,6 @@
 ### Logger
 - loguruをラップし、各Controllerからのログ出力を一元管理します。
 - ログレベルや出力先の制御を行います。
-
-### TrackListModel
-- 追跡結果(TrackInfo)のリストを管理します。
-- GUIControllerがリスト表示に利用します。
 
 ### FrameData
 - 画像データとタイムスタンプ等を保持します。
@@ -120,18 +116,15 @@
 
 ```mermaid
 classDiagram
-    CameraController --|> ConfigManager
-    ObjectTrackingController --|> ConfigManager
-    GUIController --|> ConfigManager
-    CameraController --|> Logger
-    ObjectTrackingController --|> Logger
-    GUIController --|> Logger
-    ObjectTrackingController --|> TrackListModel
-    GUIController --|> TrackListModel
-    CameraController --|> FrameData
-    ObjectTrackingController --|> DetectionResult
-    ObjectTrackingController --|> TrackInfo
-    TrackListModel --|> TrackInfo
+    CameraController --> ConfigManager
+    ObjectTrackingController --> ConfigManager
+    GUIController --> ConfigManager
+    CameraController --> Logger
+    ObjectTrackingController --> Logger
+    GUIController --> Logger
+    CameraController --> FrameData
+    ObjectTrackingController --> TrackInfo
+    ObjectTrackingController --> FrameData
 
     class ConfigManager {
         +load_config()
@@ -142,26 +135,17 @@ classDiagram
         +set_level()
     }
     class CameraController {
-        +capture()
+        +run()
     }
     class ObjectTrackingController {
-        +detect()
-        +track()
+        +run()
     }
     class GUIController {
-        +display()
-    }
-    class TrackListModel {
-        +get_track_list()
+        +run()
     }
     class FrameData {
         +image
         +timestamp
-    }
-    class DetectionResult {
-        +boxes
-        +scores
-        +class_ids
     }
     class TrackInfo {
         +track_id
@@ -207,7 +191,7 @@ python_multiprocessing_example/
 |:--|:--|
 | [opencv-python](https://pypi.org/project/opencv-python/) | カメラキャプチャや画像処理で利用 |
 | [onnxruntime](https://pypi.org/project/onnxruntime/) | 物体検出 |
-| [bytetracker](https://pypi.org/project/bytetracker/) | 物体追跡 |
+| [supervision](https://github.com/roboflow/supervision) | 物体追跡 |
 | [loguru](https://pypi.org/project/loguru/) | ロギング |
 | [PyYAML](https://pypi.org/project/PyYAML/) | 設定ファイル（YAML）の読み込み |
 | [numpy](https://numpy.org/) | 画像・推論結果の操作 |
