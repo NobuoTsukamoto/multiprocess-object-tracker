@@ -157,7 +157,7 @@ class ObjectTrackingController(multiprocessing.Process):
             detections = detections[detections.area >= self.track_config.min_box_area]
 
             # Update tracker
-            tracked_detections = tracker.update(detections=detections)
+            tracked_detections = tracker.update_with_detections(detections=detections)
 
             track_results = []
             if tracked_detections.tracker_id is not None:
