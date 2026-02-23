@@ -1,5 +1,5 @@
 [project]
-name = "python-multiprocessing-example"
+name = "multiprocess-object-tracker"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

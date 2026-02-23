@@ -1,4 +1,4 @@
-# Pythonのmultiprocessingのサンプル
+# Real-Time Multi-Process Object Tracking Application
 
 ## このアプリケーションの概要
 
