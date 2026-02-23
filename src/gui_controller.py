@@ -62,17 +62,20 @@ class GUIController:
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
+        # Right: Controls and Info (Pack this first to secure its space)
+        right_frame = ttk.Frame(main_frame, width=300)
+        right_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        right_frame.pack_propagate(False)
+
         # Left: Camera Feed
         left_frame = ttk.Frame(main_frame, width=self.gui_config.display_image_width)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
         self.image_label = tk.Label(left_frame, anchor=tk.CENTER)
         self.image_label.pack(fill=tk.BOTH, expand=True)
 
-        # Right: Controls and Info
-        right_frame = ttk.Frame(main_frame, width=300)
-        right_frame.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Controls
+        # Controls (inside right_frame)
         control_frame = ttk.LabelFrame(right_frame, text="Controls")
         control_frame.pack(fill=tk.X, pady=(0, 10))
         self.start_button = ttk.Button(
