@@ -7,15 +7,16 @@ See the LICENSE file in the project root for more information.
 import multiprocessing
 import time
 from queue import Empty, Full
-import cv2
 
+import cv2
 import numpy as np
 import onnxruntime
 import supervision as sv
 
 from config_manager import ConfigManager, LoggingConfig
+from data_models import FrameRef, TrackInfo, TrackingResult
 from logger import Logger
-from data_models import FrameData, TrackInfo
+from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
 
 
 class ObjectTrackingController(multiprocessing.Process):
@@ -23,7 +24,7 @@ class ObjectTrackingController(multiprocessing.Process):
         self,
         config_manager: ConfigManager,
         logging_config: LoggingConfig,
-        frame_queue: multiprocessing.Queue,
+        frame_pool_spec: SharedFrameSpec,
         track_queue: multiprocessing.Queue,
         stop_event: multiprocessing.Event,
     ):
@@ -32,7 +33,7 @@ class ObjectTrackingController(multiprocessing.Process):
         self.track_config = config_manager.get_config("tracking")
         self.camera_config = config_manager.get_config("camera")
         self.logging_config = logging_config
-        self.frame_queue = frame_queue
+        self.frame_pool_spec = frame_pool_spec
         self.track_queue = track_queue
         self.stop_event = stop_event
         self.logger = None
@@ -99,95 +100,111 @@ class ObjectTrackingController(multiprocessing.Process):
             frame_rate=self.camera_config.fps,
         )
 
+        frame_pool = SharedFrameAccessor(self.frame_pool_spec)
+
         frame_count = 0
         perf_start_time = time.time()
-        while not self.stop_event.is_set():
-            try:
-                frame_data: FrameData = self.frame_queue.get(timeout=1.0)
-            except Empty:
-                continue
+        try:
+            while not self.stop_event.is_set():
+                try:
+                    frame_ref: FrameRef
+                    frame_ref, image = frame_pool.read(timeout=1.0)
+                except Empty:
+                    continue
 
-            start_time = time.time()
+                start_time = time.time()
 
-            # Preprocess
-            (
-                preprocessed_image,
-                ratio,
-            ) = self._preprocess(frame_data.image, input_shape)
+                # Preprocess
+                preprocessed_image, ratio = self._preprocess(image, input_shape)
 
-            # Inference
-            input_name = session.get_inputs()[0].name
-            outputs = session.run(
-                None, {input_name: preprocessed_image[None, :, :, :]}
-            )[0]
+                # Inference
+                input_name = session.get_inputs()[0].name
+                outputs = session.run(
+                    None, {input_name: preprocessed_image[None, :, :, :]}
+                )[0]
 
-            # Ensure outputs is a numpy ndarray
-            if not isinstance(outputs, np.ndarray):
-                outputs = np.array(outputs)
+                if not isinstance(outputs, np.ndarray):
+                    outputs = np.array(outputs)
 
-            # Postprocess
-            predictions = self._postprocess(outputs, input_shape)[0]
+                # Postprocess
+                predictions = self._postprocess(outputs, input_shape)[0]
 
-            boxes = predictions[:, :4]
-            scores = predictions[:, 4:5] * predictions[:, 5:]
+                boxes = predictions[:, :4]
+                scores = predictions[:, 4:5] * predictions[:, 5:]
 
-            boxes_xyxy = np.ones_like(boxes)
-            boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.0
-            boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.0
-            boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.0
-            boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.0
-            boxes_xyxy /= ratio
+                boxes_xyxy = np.ones_like(boxes)
+                boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.0
+                boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.0
+                boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.0
+                boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.0
+                boxes_xyxy /= ratio
 
-            # Create Detections and apply NMS
-            class_ids = np.argmax(scores, axis=1)
-            confidences = np.max(scores, axis=1)
-            detections = sv.Detections(
-                xyxy=boxes_xyxy,
-                confidence=confidences,
-                class_id=class_ids,
-            )
-            # Filter by minimum score before NMS to speed up
-            detections = detections[detections.confidence > 0.1]
-            # NMS
-            detections = detections.with_nms(threshold=0.45)
-
-            # Filter detections by class_id and min_box_area
-            mask = np.isin(detections.class_id, self.track_config.class_id)
-            detections = detections[mask]
-            detections = detections[detections.area >= self.track_config.min_box_area]
-
-            # Update tracker
-            tracked_detections = tracker.update_with_detections(detections=detections)
-
-            track_results = []
-            if tracked_detections.tracker_id is not None:
-                for i in range(len(tracked_detections)):
-                    track_info = TrackInfo(
-                        track_id=int(tracked_detections.tracker_id[i]),
-                        class_id=int(tracked_detections.class_id[i]),
-                        box=tracked_detections.xyxy[i].tolist(),
-                        score=float(tracked_detections.confidence[i]),
-                    )
-                    track_results.append(track_info)
-
-            # Send results to GUI
-            try:
-                # We send both the TrackInfo list (for compatibility/listbox) 
-                # and the Detections object (for drawing)
-                self.track_queue.put_nowait((track_results, tracked_detections))
-            except Full:
-                self.logger.warning("Track queue is full.")
-
-            # Performance logging
-            process_time = (time.time() - start_time) * 1000
-            frame_count += 1
-            if frame_count % self.logging_config.performance_interval == 0:
-                elapsed = time.time() - perf_start_time
-                avg_fps = self.logging_config.performance_interval / elapsed if elapsed > 0 else 0
-                self.logger.log(
-                    "PERFORMANCE",
-                    f"frame={frame_count} | process_time={process_time:.2f}ms | avg_fps={avg_fps:.2f}",
+                class_ids = np.argmax(scores, axis=1)
+                confidences = np.max(scores, axis=1)
+                detections = sv.Detections(
+                    xyxy=boxes_xyxy,
+                    confidence=confidences,
+                    class_id=class_ids,
                 )
-                perf_start_time = time.time()
+                detections = detections[detections.confidence > 0.1]
+                detections = detections.with_nms(threshold=0.45)
 
-        self.logger.info("ObjectTrackingController process stopped.")
+                mask = np.isin(detections.class_id, self.track_config.class_id)
+                detections = detections[mask]
+                detections = detections[detections.area >= self.track_config.min_box_area]
+
+                tracked_detections = tracker.update_with_detections(detections=detections)
+
+                track_results = []
+                if tracked_detections.tracker_id is not None:
+                    for i in range(len(tracked_detections)):
+                        track_info = TrackInfo(
+                            track_id=int(tracked_detections.tracker_id[i]),
+                            class_id=int(tracked_detections.class_id[i]),
+                            box=tracked_detections.xyxy[i].tolist(),
+                            score=float(tracked_detections.confidence[i]),
+                        )
+                        track_results.append(track_info)
+
+                process_time_ms = (time.time() - start_time) * 1000
+
+                tracking_result = TrackingResult(
+                    frame_id=frame_ref.frame_id,
+                    timestamp=frame_ref.timestamp,
+                    track_infos=track_results,
+                    detections=tracked_detections,
+                    process_time_ms=process_time_ms,
+                )
+
+                try:
+                    self.track_queue.put_nowait(tracking_result)
+                except Full:
+                    # Drop oldest tracking result so the GUI sees the
+                    # most recent inference, not stale ones.
+                    try:
+                        self.track_queue.get_nowait()
+                    except Empty:
+                        pass
+                    try:
+                        self.track_queue.put_nowait(tracking_result)
+                    except Full:
+                        self.logger.warning("Track queue is full; dropped result.")
+
+                frame_count += 1
+                if frame_count % self.logging_config.performance_interval == 0:
+                    elapsed = time.time() - perf_start_time
+                    avg_fps = (
+                        self.logging_config.performance_interval / elapsed
+                        if elapsed > 0
+                        else 0
+                    )
+                    self.logger.log(
+                        "PERFORMANCE",
+                        f"frame={frame_count} | "
+                        f"process_time={process_time_ms:.2f}ms | "
+                        f"avg_fps={avg_fps:.2f}",
+                    )
+                    perf_start_time = time.time()
+        finally:
+            frame_pool.close()
+            self.logger.info("ObjectTrackingController process stopped.")

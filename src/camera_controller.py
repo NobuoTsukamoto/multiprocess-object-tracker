@@ -4,14 +4,14 @@ This software is released under the MIT License.
 See the LICENSE file in the project root for more information.
 """
 
-import cv2
-import time
 import multiprocessing
-from queue import Empty, Full
+import time
+
+import cv2
 
 from config_manager import ConfigManager, LoggingConfig
 from logger import Logger
-from data_models import FrameData
+from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
 
 
 class CameraController(multiprocessing.Process):
@@ -19,87 +19,76 @@ class CameraController(multiprocessing.Process):
         self,
         config_manager: ConfigManager,
         logging_config: LoggingConfig,
-        tracking_frame_queue: multiprocessing.Queue,
-        gui_frame_queue: multiprocessing.Queue,
+        tracking_pool_spec: SharedFrameSpec,
+        gui_pool_spec: SharedFrameSpec,
         stop_event: multiprocessing.Event,
     ):
         super().__init__()
         self.config = config_manager.get_config("camera")
         self.logging_config = logging_config
-        self.tracking_frame_queue = tracking_frame_queue
-        self.gui_frame_queue = gui_frame_queue
+        self.tracking_pool_spec = tracking_pool_spec
+        self.gui_pool_spec = gui_pool_spec
         self.stop_event = stop_event
         self.frame_id = 0
         self.logger = None
-
-        # キューのインスタンスをログ出力（warning出力時に区別できるように）
-        self.tracking_frame_queue_name = (
-            f"TrackingQueue-{id(self.tracking_frame_queue)}"
-        )
-        self.gui_frame_queue_name = f"GuiQueue-{id(self.gui_frame_queue)}"
-
-    def _put_frame_to_queue(
-        self, queue: multiprocessing.Queue, frame_data: FrameData, queue_name: str
-    ):
-        # キューがいっぱいなら一番古いものを捨てる
-        if queue.full():
-            try:
-                queue.get_nowait()
-            except Empty:
-                pass  # 他のプロセスが同時にgetした場合
-
-        try:
-            queue.put_nowait(frame_data)
-            if self.logger is not None:
-                self.logger.debug(
-                    f"Frame {frame_data.frame_id} put into {queue_name}. size = {queue.qsize()}"
-                )
-        except Full:
-            if self.logger is not None:
-                self.logger.warning(
-                    f"Queue for {queue_name} is still full after trying to make space."
-                )
 
     def run(self):
         self.logger = Logger(self.logging_config).get_logger()
         self.logger.info("CameraController process started.")
 
-        cap = cv2.VideoCapture(0)  # 0はデフォルトのカメラ
+        # Attach to shared memory pools (must be done in the child process).
+        tracking_pool = SharedFrameAccessor(self.tracking_pool_spec)
+        gui_pool = SharedFrameAccessor(self.gui_pool_spec)
+
+        cap = cv2.VideoCapture(0)  # 0 はデフォルトのカメラ
         if not cap.isOpened():
             self.logger.error("Failed to open camera.")
+            tracking_pool.close()
+            gui_pool.close()
             return
 
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.height)
         cap.set(cv2.CAP_PROP_FPS, self.config.fps)
 
-        while not self.stop_event.is_set():
-            ret, frame = cap.read()
-            if not ret:
-                self.logger.warning("Failed to grab frame.")
-                time.sleep(0.1)
-                continue
+        try:
+            while not self.stop_event.is_set():
+                ret, frame = cap.read()
+                if not ret:
+                    self.logger.warning("Failed to grab frame.")
+                    time.sleep(0.1)
+                    continue
 
-            timestamp = time.time()
-            frame_data = FrameData(
-                frame_id=self.frame_id, timestamp=timestamp, image=frame
-            )
+                # Resize/pad if camera returned an unexpected shape so it
+                # fits the SHM slot. Most cameras honor the requested
+                # resolution; this is a safety net.
+                expected_shape = tracking_pool.shape
+                if frame.shape != expected_shape:
+                    frame = cv2.resize(
+                        frame, (expected_shape[1], expected_shape[0])
+                    )
 
-            # 両方のキューにフレームを入れる
-            self._put_frame_to_queue(
-                self.tracking_frame_queue, frame_data, self.tracking_frame_queue_name
-            )
-            self._put_frame_to_queue(
-                self.gui_frame_queue, frame_data, self.gui_frame_queue_name
-            )
+                timestamp = time.time()
 
-            self.frame_id += 1
+                ok_t = tracking_pool.write(frame, self.frame_id, timestamp)
+                ok_g = gui_pool.write(frame, self.frame_id, timestamp)
 
-            self.logger.debug(
-                f"Frame {self.frame_id} captured and put into queues: "
-                f"{self.tracking_frame_queue_name}, {self.gui_frame_queue_name}"
-            )
-            time.sleep(0.015)
+                if not ok_t:
+                    self.logger.warning(
+                        f"Tracking pool dropped frame {self.frame_id} "
+                        "(no free slot)."
+                    )
+                if not ok_g:
+                    self.logger.warning(
+                        f"GUI pool dropped frame {self.frame_id} "
+                        "(no free slot)."
+                    )
 
-        cap.release()
-        self.logger.info("CameraController process stopped.")
+                self.logger.debug(f"Frame {self.frame_id} published.")
+                self.frame_id += 1
+                # cap.read() already paces with camera FPS; no extra sleep.
+        finally:
+            cap.release()
+            tracking_pool.close()
+            gui_pool.close()
+            self.logger.info("CameraController process stopped.")
