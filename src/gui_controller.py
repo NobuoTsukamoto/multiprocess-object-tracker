@@ -4,22 +4,23 @@ This software is released under the MIT License.
 See the LICENSE file in the project root for more information.
 """
 
-import tkinter as tk
-from tkinter import ttk
 import multiprocessing
-from queue import Empty
-from collections import deque
 import time
+import tkinter as tk
+from collections import OrderedDict, deque
+from queue import Empty
+from tkinter import ttk
 
-from PIL import Image, ImageTk
 import cv2
-import numpy as np
 import supervision as sv
+from PIL import Image, ImageTk
 
-from config_manager import ConfigManager
-from logger import Logger
 from camera_controller import CameraController
+from config_manager import ConfigManager
+from data_models import TrackingResult
+from logger import Logger
 from object_tracking_controller import ObjectTrackingController
+from shared_frame_pool import SharedFrameAccessor, SharedFramePool
 
 
 class GUIController:
@@ -27,6 +28,7 @@ class GUIController:
         self.config_manager = config_manager
         self.logger = logger.get_logger()
         self.gui_config = self.config_manager.get_config("gui")
+        self.camera_config = self.config_manager.get_config("camera")
 
         self.root = tk.Tk()
         self.root.title("Object Detection and Tracking")
@@ -37,19 +39,50 @@ class GUIController:
 
         # Process management
         self.stop_event = multiprocessing.Event()
-        max_queue_size = self.config_manager.get_config("camera").max_queue_length
-        self.tracking_frame_queue = multiprocessing.Queue(maxsize=max_queue_size)
-        self.gui_frame_queue = multiprocessing.Queue(maxsize=max_queue_size)
-        self.track_queue = multiprocessing.Queue()
+        max_queue_size = self.camera_config.max_queue_length
+
+        # Shared-memory pools. Slot count is queue size + 2 so the
+        # consumer always has a spare slot in flight.
+        frame_shape = (self.camera_config.height, self.camera_config.width, 3)
+        n_slots = max_queue_size + 2
+
+        self.tracking_data_queue: multiprocessing.Queue = multiprocessing.Queue(
+            maxsize=max_queue_size
+        )
+        self.gui_data_queue: multiprocessing.Queue = multiprocessing.Queue(
+            maxsize=max_queue_size
+        )
+        self.track_queue: multiprocessing.Queue = multiprocessing.Queue(
+            maxsize=max_queue_size
+        )
+
+        self.tracking_pool = SharedFramePool(
+            n_slots=n_slots,
+            shape=frame_shape,
+            dtype="uint8",
+            data_queue=self.tracking_data_queue,
+        )
+        self.gui_pool = SharedFramePool(
+            n_slots=n_slots,
+            shape=frame_shape,
+            dtype="uint8",
+            data_queue=self.gui_data_queue,
+        )
+
+        # Reader handle for the GUI (main) process
+        self.gui_pool_reader = SharedFrameAccessor(self.gui_pool.spec)
+
         self.camera_process = None
         self.tracking_process = None
 
         # Performance stats
         self.frame_times = deque(maxlen=100)
+        self.last_process_time_ms = 0.0
 
-        # Tracking results
-        self.last_track_results = []
-        self.last_tracked_detections = None
+        # Recent frames keyed by frame_id, for synchronized overlay.
+        self._frame_buffer: "OrderedDict[int, any]" = OrderedDict()
+        self._frame_buffer_max = max_queue_size + 2
+        self._latest_track: TrackingResult = None
 
         # Supervision Annotators
         self.box_annotator = sv.BoxAnnotator()
@@ -62,20 +95,17 @@ class GUIController:
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Right: Controls and Info (Pack this first to secure its space)
         right_frame = ttk.Frame(main_frame, width=300)
         right_frame.pack(side=tk.RIGHT, fill=tk.Y)
         right_frame.pack_propagate(False)
 
-        # Left: Camera Feed
         left_frame = ttk.Frame(main_frame, width=self.gui_config.display_image_width)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         left_frame.pack_propagate(False)
-        
+
         self.image_label = tk.Label(left_frame, anchor=tk.CENTER)
         self.image_label.pack(fill=tk.BOTH, expand=True)
 
-        # Controls (inside right_frame)
         control_frame = ttk.LabelFrame(right_frame, text="Controls")
         control_frame.pack(fill=tk.X, pady=(0, 10))
         self.start_button = ttk.Button(
@@ -90,13 +120,11 @@ class GUIController:
         )
         self.stop_button.pack(fill=tk.X, padx=5, pady=5)
 
-        # Performance
         perf_frame = ttk.LabelFrame(right_frame, text="Performance")
         perf_frame.pack(fill=tk.X, pady=10)
         self.perf_label = ttk.Label(perf_frame, text="-- ms, -- FPS")
         self.perf_label.pack(padx=5, pady=5)
 
-        # Track List
         track_frame = ttk.LabelFrame(right_frame, text="Tracked Objects")
         track_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         self.track_list = tk.Listbox(track_frame)
@@ -104,6 +132,12 @@ class GUIController:
 
     def start_tracking(self):
         self.logger.info("Starting tracking processes...")
+
+        # Recover any slots left dangling from a previous run.
+        self.tracking_pool.reset_free_slots()
+        self.gui_pool.reset_free_slots()
+        self._frame_buffer.clear()
+        self._latest_track = None
         self.stop_event.clear()
 
         logging_config = self.config_manager.get_config("logging")
@@ -111,14 +145,14 @@ class GUIController:
         self.camera_process = CameraController(
             self.config_manager,
             logging_config,
-            self.tracking_frame_queue,
-            self.gui_frame_queue,
+            self.tracking_pool.spec,
+            self.gui_pool.spec,
             self.stop_event,
         )
         self.tracking_process = ObjectTrackingController(
             self.config_manager,
             logging_config,
-            self.tracking_frame_queue,
+            self.tracking_pool.spec,
             self.track_queue,
             self.stop_event,
         )
@@ -152,44 +186,89 @@ class GUIController:
         self.start_button.config(state=tk.NORMAL)
         self.stop_button.config(state=tk.DISABLED)
 
+    def _drain_frames(self):
+        """Pull every available frame out of the GUI pool and buffer it."""
+        while True:
+            try:
+                ref, image = self.gui_pool_reader.read_nowait()
+            except Empty:
+                break
+            self._frame_buffer[ref.frame_id] = image
+            self.frame_times.append(time.time())
+            # Trim oldest if over capacity.
+            while len(self._frame_buffer) > self._frame_buffer_max:
+                self._frame_buffer.popitem(last=False)
+
+    def _drain_track_results(self):
+        """Keep only the most recent tracking result."""
+        latest = self._latest_track
+        while True:
+            try:
+                latest = self.track_queue.get_nowait()
+            except Empty:
+                break
+        if latest is not self._latest_track:
+            self._latest_track = latest
+            self.last_process_time_ms = latest.process_time_ms
+
+            # Update Listbox with the new tracking results.
+            self.track_list.delete(0, tk.END)
+            class_names = self.config_manager.get_config("detection").class_names
+            for i, track in enumerate(latest.track_infos):
+                if i >= 10:
+                    self.track_list.insert(tk.END, "...")
+                    break
+                self.track_list.insert(
+                    tk.END,
+                    f"ID: {track.track_id}, Class: {class_names[track.class_id]}",
+                )
+
+    def _select_display_frame(self):
+        """Pick the frame to display.
+
+        Priority: the frame matching the latest tracking result so the
+        overlay is drawn on the correct image. If unavailable, show
+        the newest buffered frame without an overlay.
+        Returns (image, detections_or_None).
+        """
+        if not self._frame_buffer:
+            return None, None
+
+        # Try matched frame first.
+        if self._latest_track is not None:
+            fid = self._latest_track.frame_id
+            if fid in self._frame_buffer:
+                # Drop any frames older than the matched one to free memory.
+                while self._frame_buffer and next(iter(self._frame_buffer)) < fid:
+                    self._frame_buffer.popitem(last=False)
+                return self._frame_buffer[fid], self._latest_track.detections
+
+        # Fall back to newest frame, no overlay.
+        newest_fid = next(reversed(self._frame_buffer))
+        return self._frame_buffer[newest_fid], None
+
     def _update_gui(self):
-        self.logger.debug("IN: _update_gui")
+        self._drain_frames()
+        self._drain_track_results()
 
-        try:
-            # Get the latest frame
-            frame_data = self.gui_frame_queue.get_nowait()
-            self.last_frame_time = time.time()
-            self.frame_times.append(self.last_frame_time)
-            img = frame_data.image
-
-            # Get the latest tracking results
-            if not self.track_queue.empty():
-                self.last_track_results, self.last_tracked_detections = self.track_queue.get_nowait()
-
-                # Update Listbox
-                self.track_list.delete(0, tk.END)
+        image, detections = self._select_display_frame()
+        if image is not None:
+            img = image
+            if detections is not None and len(detections) > 0:
                 class_names = self.config_manager.get_config("detection").class_names
-                for i, track in enumerate(self.last_track_results):
-                    if i >= 10:
-                        self.track_list.insert(tk.END, "...")
-                        break
-                    self.track_list.insert(
-                        tk.END, f"ID: {track.track_id}, Class: {class_names[track.class_id]}"
-                    )
-
-            # Draw bounding boxes if there are tracking results
-            if self.last_tracked_detections is not None:
-                class_names = self.config_manager.get_config("detection").class_names
-                # Draw using supervision
                 labels = [
                     f"ID:{tracker_id} {class_names[class_id]} ({confidence:.2f})"
-                    for confidence, class_id, tracker_id
-                    in zip(self.last_tracked_detections.confidence, self.last_tracked_detections.class_id, self.last_tracked_detections.tracker_id)
+                    for confidence, class_id, tracker_id in zip(
+                        detections.confidence,
+                        detections.class_id,
+                        detections.tracker_id,
+                    )
                 ]
-                img = self.box_annotator.annotate(scene=img, detections=self.last_tracked_detections)
-                img = self.label_annotator.annotate(scene=img, detections=self.last_tracked_detections, labels=labels)
+                img = self.box_annotator.annotate(scene=img.copy(), detections=detections)
+                img = self.label_annotator.annotate(
+                    scene=img, detections=detections, labels=labels
+                )
 
-            # Convert image for display
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(
                 img,
@@ -200,32 +279,31 @@ class GUIController:
             )
             img = Image.fromarray(img)
             img_tk = ImageTk.PhotoImage(image=img)
-            self._imgtk = img_tk  # Keep a reference to avoid garbage collection
+            self._imgtk = img_tk  # keep a reference
             self.image_label.config(image=img_tk)
 
-        except Empty:
-            pass  # Queues might be empty, which is fine
-
-        # Update performance stats
+        # Performance: show the actual inference latency reported by
+        # the tracking process plus the camera-to-GUI FPS.
         if len(self.frame_times) > 1:
             elapsed = self.frame_times[-1] - self.frame_times[0]
             avg_fps = len(self.frame_times) / elapsed if elapsed > 0 else 0
-            # Calculate processing time based on the last frame time
-            process_time = (
-                (time.time() - self.last_frame_time) * 1000
-                if hasattr(self, "last_frame_time")
-                else 0
+            self.perf_label.config(
+                text=f"{self.last_process_time_ms:.2f} ms, {avg_fps:.2f} FPS"
             )
-            self.perf_label.config(text=f"{process_time:.2f} ms, {avg_fps:.2f} FPS")
 
         if not self.stop_event.is_set():
-            self.root.after(5, self._update_gui)  # ~60 FPS
-
-        self.logger.debug("OUT: _update_gui")
+            self.root.after(5, self._update_gui)
 
     def on_closing(self):
         if self.camera_process and self.camera_process.is_alive():
             self.stop_tracking()
+        # Release shared memory.
+        try:
+            self.gui_pool_reader.close()
+        except Exception:
+            pass
+        self.tracking_pool.cleanup()
+        self.gui_pool.cleanup()
         self.root.destroy()
 
     def run(self):
