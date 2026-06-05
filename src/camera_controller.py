@@ -73,6 +73,8 @@ class CameraController(multiprocessing.Process):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.height)
         cap.set(cv2.CAP_PROP_FPS, self.config.fps)
 
+        # cap.read() がカメラのハードウェアFPSでブロックするため、
+        # こちら側では追加の待機を行わずフレームレートに追従する
         while not self.stop_event.is_set():
             ret, frame = cap.read()
             if not ret:
@@ -99,7 +101,6 @@ class CameraController(multiprocessing.Process):
                 f"Frame {self.frame_id} captured and put into queues: "
                 f"{self.tracking_frame_queue_name}, {self.gui_frame_queue_name}"
             )
-            time.sleep(0.015)
 
         cap.release()
         self.logger.info("CameraController process stopped.")
