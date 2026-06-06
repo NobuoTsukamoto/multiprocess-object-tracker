@@ -4,6 +4,7 @@ This software is released under the MIT License.
 See the LICENSE file in the project root for more information.
 """
 
+import math
 import multiprocessing
 import time
 import tkinter as tk
@@ -24,6 +25,13 @@ from shared_frame_pool import SharedFrameAccessor, SharedFramePool
 
 
 class GUIController:
+    @staticmethod
+    def _calculate_frame_buffer_max(
+        fps: int, frame_buffer_seconds: float, minimum: int
+    ) -> int:
+        buffered_frames = math.ceil(max(0, fps) * max(0.0, frame_buffer_seconds))
+        return max(minimum, buffered_frames)
+
     def __init__(self, config_manager: ConfigManager, logger: Logger):
         self.config_manager = config_manager
         self.logger = logger.get_logger()
@@ -81,8 +89,14 @@ class GUIController:
 
         # Recent frames keyed by frame_id, for synchronized overlay.
         self._frame_buffer: "OrderedDict[int, any]" = OrderedDict()
-        self._frame_buffer_max = max_queue_size + 2
+        self._frame_buffer_max = self._calculate_frame_buffer_max(
+            fps=self.camera_config.fps,
+            frame_buffer_seconds=self.gui_config.frame_buffer_seconds,
+            minimum=max_queue_size + 2,
+        )
         self._latest_track: TrackingResult = None
+        self._overlay_miss_count = 0
+        self._last_overlay_miss_frame_id = None
 
         # Supervision Annotators
         self.box_annotator = sv.BoxAnnotator()
@@ -242,10 +256,36 @@ class GUIController:
                 while self._frame_buffer and next(iter(self._frame_buffer)) < fid:
                     self._frame_buffer.popitem(last=False)
                 return self._frame_buffer[fid], self._latest_track.detections
+            self._record_overlay_miss_if_stale(fid)
 
         # Fall back to newest frame, no overlay.
         newest_fid = next(reversed(self._frame_buffer))
         return self._frame_buffer[newest_fid], None
+
+    def _record_overlay_miss_if_stale(self, track_frame_id: int):
+        """Log once when a tracking result is older than the GUI frame buffer."""
+        if not self._frame_buffer:
+            return
+
+        oldest_fid = next(iter(self._frame_buffer))
+        if track_frame_id >= oldest_fid:
+            return
+
+        if self._last_overlay_miss_frame_id == track_frame_id:
+            return
+
+        newest_fid = next(reversed(self._frame_buffer))
+        self._overlay_miss_count += 1
+        self._last_overlay_miss_frame_id = track_frame_id
+        self.logger.warning(
+            "Overlay miss: "
+            f"track_frame_id={track_frame_id}, "
+            f"oldest_buffered_frame_id={oldest_fid}, "
+            f"newest_buffered_frame_id={newest_fid}, "
+            f"buffer_size={len(self._frame_buffer)}, "
+            f"buffer_limit={self._frame_buffer_max}, "
+            f"miss_count={self._overlay_miss_count}"
+        )
 
     def _update_gui(self):
         self._drain_frames()
