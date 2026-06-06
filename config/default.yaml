@@ -1,5 +1,5 @@
 camera:
-  fps: 30
+  fps: 15
   width: 1280
   height: 720
   max_queue_length: 10
