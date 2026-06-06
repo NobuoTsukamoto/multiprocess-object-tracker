@@ -25,6 +25,8 @@ tracking:
   min_box_area: 100
   iou_threshold: 0.5
   max_track_num: 10
+  frame_read_policy: bounded_latest # fifo, latest, or bounded_latest
+  max_frame_skip: 2 # Used by bounded_latest
 
 gui:
   window_width: 1600

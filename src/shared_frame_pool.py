@@ -174,6 +174,49 @@ class SharedFrameAccessor:
             pass
         return ref, frame
 
+    def read_latest(self, timeout: float = 1.0, max_skip: int | None = None):
+        """Block for the next FrameRef, then skip ahead to the newest one.
+
+        Blocks up to `timeout` seconds for the first FrameRef, then
+        drains additional queued refs without blocking, returning the
+        slots of the skipped (older) frames to the free pool. If
+        `max_skip` is set, at most that many queued frames are skipped.
+        Only the selected frame is copied and returned.
+
+        This keeps a slow consumer near real-time instead of falling
+        progressively further behind by processing every frame FIFO. A
+        bounded skip can reduce tracker instability caused by large
+        frame_id jumps.
+        Returns (FrameRef, np.ndarray copy of frame, skipped_count). Raises
+        queue.Empty on timeout.
+        """
+        if max_skip is not None:
+            max_skip = max(0, max_skip)
+
+        ref: FrameRef = self.spec.data_queue.get(timeout=timeout)
+        skipped_count = 0
+        while True:
+            if max_skip is not None and skipped_count >= max_skip:
+                break
+            try:
+                newer: FrameRef = self.spec.data_queue.get_nowait()
+            except Empty:
+                break
+            # Discard the older frame: release its slot, keep the newer.
+            try:
+                self.spec.free_queue.put_nowait(ref.slot)
+            except Full:
+                pass
+            ref = newer
+            skipped_count += 1
+
+        frame = self.views[ref.slot].copy()
+        try:
+            self.spec.free_queue.put_nowait(ref.slot)
+        except Full:
+            pass
+        return ref, frame, skipped_count
+
     def close(self):
         for s in self.shms:
             try:
