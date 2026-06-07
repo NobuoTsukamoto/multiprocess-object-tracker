@@ -202,7 +202,6 @@ class GUIController:
     def _create_widgets(self):
         style = ttk.Style(self.root)
         style.configure("Large.TButton", font=("TkDefaultFont", 12), padding=(12, 10))
-        style.configure("Status.TLabel", font=("TkDefaultFont", 12, "bold"))
         fixed_font = tkfont.nametofont("TkFixedFont")
 
         main_frame = ttk.Frame(self.root, padding=10)
