@@ -97,7 +97,6 @@ class GUIController:
         self.tracking_process = None
 
         # Performance stats
-        self.frame_times = deque(maxlen=100)
         self.camera_frame_times = deque(maxlen=100)
         self.tracking_result_times = deque(maxlen=100)
         self.display_times = deque(maxlen=100)
