@@ -60,7 +60,8 @@ flowchart LR
 ## 不変条件 / 前提条件
 
 - **スロット単一所有**: slot は free_queue か data_queue の片方にのみ存在する（write は free→data、read は data→free）。出典 `:180-200,212-218,255-270`。
-- **reset の前提**: `reset_free_slots()` は全 worker/accessor 停止後のみ。稼働中呼び出しは `RuntimeError`。lock を増やさず guard + 前提明示で高速パスを保つ設計。出典 `:113-138`。
+- **単一 writer 前提（evict-oldest の正当性）**: evict-oldest が「data_queue 先頭 = 最古フレーム」を捨てる前提は、**1 プールにつき writer が 1 つ**であり書き込みが時系列順に publish されることに依存する。本実装ではプールごとに writer は CameraController のみのため成立する。複数 writer が同一プールに publish すると FIFO 順と時系列順が一致せず、「先頭＝最古」が崩れる。出典 `:179-185`、関連 [`structure.md`](../../steering/structure.md) の IPC 規約。
+- **reset の前提**: `reset_free_slots()` は全 worker/accessor 停止後のみ。稼働中呼び出しは `RuntimeError`。lock を増やさず guard + 前提明示で高速パスを保つ設計。なお `_active` フラグは実プロセス状態を監視するものではなく、**呼び出し側（GUIController のライフサイクル）が `mark_active()` / `mark_inactive()` を正しく呼ぶことに依存する**。フラグ管理を誤ると guard は意図どおり機能しない。出典 `:105-129`。
 - **owner/accessor の責務分離**: 生成・unlink は owner のみ。accessor は attach/close のみで unlink しない。出典 `:140-150,273-280`。
 
 ## エッジケース / 異常系
