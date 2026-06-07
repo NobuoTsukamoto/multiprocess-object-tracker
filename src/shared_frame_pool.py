@@ -231,9 +231,10 @@ class SharedFrameAccessor:
 
         Blocks up to `timeout` seconds for the first FrameRef, then
         drains additional queued refs without blocking, returning the
-        slots of the skipped (older) frames to the free pool. If
-        `max_skip` is set, at most that many queued frames are skipped.
-        Only the selected frame is copied and returned.
+        slots of the skipped (older) frames to the free pool. If `max_skip`
+        is None, all queued frames are skipped (latest); if `max_skip` <= 0,
+        none are skipped (FIFO); otherwise, at most `max_skip` frames are skipped
+        and only the selected frame is copied and returned.
 
         This keeps a slow consumer near real-time instead of falling
         progressively further behind by processing every frame FIFO. A
