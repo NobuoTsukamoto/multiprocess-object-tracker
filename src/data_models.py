@@ -49,3 +49,5 @@ class TrackingResult:
     track_infos: List[TrackInfo]
     detections: Any  # supervision.Detections
     process_time_ms: float
+    queue_latency_ms: float = 0.0
+    total_latency_ms: float = 0.0
