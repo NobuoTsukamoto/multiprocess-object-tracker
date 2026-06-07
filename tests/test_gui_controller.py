@@ -12,9 +12,21 @@ from gui_controller import GUIController
 class _LoggerStub:
     def __init__(self):
         self.warning_messages = []
+        self.error_messages = []
 
     def warning(self, message):
         self.warning_messages.append(message)
+
+    def error(self, message):
+        self.error_messages.append(message)
+
+
+class _ProcessStub:
+    def __init__(self, alive):
+        self._alive = alive
+
+    def is_alive(self):
+        return self._alive
 
 
 def _make_controller(frame_ids, track_frame_id=None, detections="detections"):
@@ -80,6 +92,16 @@ class GUIControllerTest(unittest.TestCase):
         self.assertIsNone(detections)
         self.assertEqual(controller._overlay_miss_count, 0)
         self.assertEqual(controller.logger.warning_messages, [])
+
+    def test_workers_alive_checks_camera_and_tracking_processes(self):
+        controller = object.__new__(GUIController)
+        controller.camera_process = _ProcessStub(alive=False)
+        controller.tracking_process = _ProcessStub(alive=True)
+
+        self.assertTrue(controller._workers_alive())
+
+        controller.tracking_process = _ProcessStub(alive=False)
+        self.assertFalse(controller._workers_alive())
 
 
 if __name__ == "__main__":

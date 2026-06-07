@@ -9,7 +9,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data_models import FrameRef
-from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
+from shared_frame_pool import SharedFrameAccessor, SharedFramePool, SharedFrameSpec
 
 
 class _FlakyQueue:
@@ -71,6 +71,27 @@ def _cleanup(shms):
 
 
 class SharedFramePoolTest(unittest.TestCase):
+    def test_reset_free_slots_is_guarded_while_pool_is_active(self):
+        pool = SharedFramePool(
+            n_slots=1,
+            shape=(1, 1, 1),
+            dtype="uint8",
+            data_queue=Queue(maxsize=1),
+        )
+        try:
+            self.assertFalse(pool.is_active)
+            pool.mark_active()
+            self.assertTrue(pool.is_active)
+
+            with self.assertRaises(RuntimeError):
+                pool.reset_free_slots()
+
+            pool.mark_inactive()
+            self.assertFalse(pool.is_active)
+            pool.reset_free_slots()
+        finally:
+            pool.cleanup()
+
     def test_read_latest_returns_skipped_count_and_drains_to_newest(self):
         spec, shms = _make_spec()
         writer = SharedFrameAccessor(spec)

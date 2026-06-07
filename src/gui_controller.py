@@ -171,8 +171,20 @@ class GUIController:
             self.stop_event,
         )
 
-        self.camera_process.start()
-        self.tracking_process.start()
+        self.tracking_pool.mark_active()
+        self.gui_pool.mark_active()
+        try:
+            self.camera_process.start()
+            self.tracking_process.start()
+        except Exception:
+            self.stop_event.set()
+            self._terminate_process_if_alive(self.camera_process, "CameraController")
+            self._terminate_process_if_alive(
+                self.tracking_process, "ObjectTrackingController"
+            )
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+            raise
 
         self.start_button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
@@ -182,23 +194,50 @@ class GUIController:
         self.logger.info("Stopping tracking processes...")
         self.stop_event.set()
 
-        if self.camera_process:
-            self.camera_process.join(timeout=5)
-            if self.camera_process.is_alive():
-                self.logger.warning(
-                    "CameraController did not terminate gracefully. Terminating."
-                )
-                self.camera_process.terminate()
-        if self.tracking_process:
-            self.tracking_process.join(timeout=5)
-            if self.tracking_process.is_alive():
-                self.logger.warning(
-                    "ObjectTrackingController did not terminate gracefully. Terminating."
-                )
-                self.tracking_process.terminate()
+        camera_stopped = self._stop_process(self.camera_process, "CameraController")
+        tracking_stopped = self._stop_process(
+            self.tracking_process, "ObjectTrackingController"
+        )
+        if camera_stopped and tracking_stopped:
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+        else:
+            self.logger.error(
+                "Some worker processes are still alive; shared frame pools remain "
+                "active and cannot be reset safely."
+            )
+            self.start_button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.NORMAL)
 
-        self.start_button.config(state=tk.NORMAL)
-        self.stop_button.config(state=tk.DISABLED)
+    def _stop_process(self, process, process_name: str) -> bool:
+        if process is None:
+            return True
+
+        process.join(timeout=5)
+        if process.is_alive():
+            self.logger.warning(
+                f"{process_name} did not terminate gracefully. Terminating."
+            )
+            self._terminate_process_if_alive(process, process_name)
+
+        return not process.is_alive()
+
+    def _terminate_process_if_alive(self, process, process_name: str):
+        if process is None or not process.is_alive():
+            return
+
+        process.terminate()
+        process.join(timeout=2)
+        if process.is_alive():
+            self.logger.error(f"{process_name} is still alive after terminate().")
+
+    def _workers_alive(self) -> bool:
+        return any(
+            process is not None and process.is_alive()
+            for process in (self.camera_process, self.tracking_process)
+        )
 
     def _drain_frames(self):
         """Pull every available frame out of the GUI pool and buffer it."""
@@ -335,15 +374,24 @@ class GUIController:
             self.root.after(5, self._update_gui)
 
     def on_closing(self):
-        if self.camera_process and self.camera_process.is_alive():
+        if self._workers_alive():
             self.stop_tracking()
         # Release shared memory.
         try:
             self.gui_pool_reader.close()
         except Exception:
             pass
-        self.tracking_pool.cleanup()
-        self.gui_pool.cleanup()
+
+        if self._workers_alive():
+            self.logger.error(
+                "Skipping shared memory cleanup because worker processes are "
+                "still alive."
+            )
+        else:
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+            self.tracking_pool.cleanup()
+            self.gui_pool.cleanup()
         self.root.destroy()
 
     def run(self):

@@ -86,6 +86,7 @@ class SharedFramePool:
         for i in range(n_slots):
             self.free_queue.put(i)
         self.data_queue = data_queue
+        self._active = False
 
     @property
     def spec(self) -> SharedFrameSpec:
@@ -97,12 +98,36 @@ class SharedFramePool:
             data_queue=self.data_queue,
         )
 
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    def mark_active(self):
+        """Mark this pool as owned by running worker processes."""
+        self._active = True
+
+    def mark_inactive(self):
+        """Mark this pool as safe for owner-side queue repair/reset."""
+        self._active = False
+
     def reset_free_slots(self):
         """Drain queues and refill free_queue with all slots.
 
-        Call between start/stop cycles to recover any slots that were
-        held by terminated workers.
+        Call only after all workers/accessors using this pool have
+        stopped. Calling while a writer or reader can still hold a slot
+        breaks slot ownership: a slot may be returned to free_queue while
+        another process is still reading from or writing to it.
+
+        This owner-side reset is intentionally guarded instead of being
+        made lock-heavy; normal frame transfer stays fast, and lifecycle
+        code must make the stopped-workers precondition explicit.
         """
+        if self._active:
+            raise RuntimeError(
+                "reset_free_slots() must only be called after all workers "
+                "using this pool have stopped."
+            )
+
         for q in (self.free_queue, self.data_queue):
             while True:
                 try:
