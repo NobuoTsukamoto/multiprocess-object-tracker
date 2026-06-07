@@ -463,7 +463,6 @@ class GUIController:
             self._frame_buffer[ref.frame_id] = image
             self._frame_timestamps[ref.frame_id] = ref.timestamp
             received_at = time.time()
-            self.frame_times.append(received_at)
             self.camera_frame_times.append(ref.timestamp)
             self.last_camera_latency_ms = (received_at - ref.timestamp) * 1000
             # Trim oldest if over capacity.
