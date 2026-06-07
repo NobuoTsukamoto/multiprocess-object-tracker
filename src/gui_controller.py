@@ -346,7 +346,6 @@ class GUIController:
         self._last_render_key = None
         self._last_display_image = None
         self._last_display_detections = None
-        self.frame_times.clear()
         self.camera_frame_times.clear()
         self.tracking_result_times.clear()
         self.display_times.clear()
