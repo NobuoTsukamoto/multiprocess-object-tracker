@@ -121,6 +121,8 @@ class GUIController:
         self._last_display_detections = None
         self._overlay_miss_count = 0
         self._last_overlay_miss_frame_id = None
+        self._run_started_at = None
+        self._first_frame_logged = False
 
         # Supervision Annotators
         self.box_annotator = sv.BoxAnnotator()
@@ -332,12 +334,27 @@ class GUIController:
             self.video_status_label.config(text=text, bg=color, fg="#ffffff")
             self.video_status_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
+    @staticmethod
+    def _drain_queue_nowait(queue: multiprocessing.Queue) -> int:
+        drained = 0
+        while True:
+            try:
+                queue.get_nowait()
+            except Empty:
+                return drained
+            drained += 1
+
     def start_tracking(self):
         self.logger.info("Starting tracking processes...")
 
         # Recover any slots left dangling from a previous run.
         self.tracking_pool.reset_free_slots()
         self.gui_pool.reset_free_slots()
+        drained_tracks = self._drain_queue_nowait(self.track_queue)
+        if drained_tracks:
+            self.logger.info(
+                f"Drained {drained_tracks} stale tracking results before restart."
+            )
         self._frame_buffer.clear()
         self._frame_timestamps.clear()
         self._latest_track = None
@@ -353,6 +370,8 @@ class GUIController:
         self.last_detection_total_latency_ms = 0.0
         self.last_camera_latency_ms = 0.0
         self.last_display_latency_ms = 0.0
+        self._run_started_at = time.time()
+        self._first_frame_logged = False
         self.stop_event.clear()
 
         logging_config = self.config_manager.get_config("logging")
@@ -394,6 +413,7 @@ class GUIController:
 
     def stop_tracking(self):
         self.logger.info("Stopping tracking processes...")
+        stop_started_at = time.time()
         self._set_status("停止処理中", running=False)
         self.root.update_idletasks()
         self.stop_event.set()
@@ -409,6 +429,9 @@ class GUIController:
             self.stop_button.config(state=tk.DISABLED)
             self._set_status("停止中", running=False)
             self._show_inactive_display("停止中")
+            self.logger.info(
+                f"Tracking processes stopped in {time.time() - stop_started_at:.3f}s."
+            )
         else:
             self.logger.error(
                 "Some worker processes are still alive; shared frame pools remain "
@@ -417,6 +440,9 @@ class GUIController:
             self.start_button.config(state=tk.DISABLED)
             self.stop_button.config(state=tk.NORMAL)
             self._set_status("停止失敗", running=False)
+            self.logger.warning(
+                f"Stop attempt took {time.time() - stop_started_at:.3f}s."
+            )
 
     def _stop_process(self, process, process_name: str) -> bool:
         if process is None:
@@ -462,6 +488,14 @@ class GUIController:
             self._frame_buffer[ref.frame_id] = image
             self._frame_timestamps[ref.frame_id] = ref.timestamp
             received_at = time.time()
+            if not self._first_frame_logged and self._run_started_at is not None:
+                self._first_frame_logged = True
+                self.logger.info(
+                    "First GUI frame after start: "
+                    f"frame_id={ref.frame_id}, "
+                    f"elapsed={received_at - self._run_started_at:.3f}s, "
+                    f"camera_latency={(received_at - ref.timestamp) * 1000:.1f}ms"
+                )
             self.camera_frame_times.append(ref.timestamp)
             self.last_camera_latency_ms = (received_at - ref.timestamp) * 1000
             # Trim oldest if over capacity.

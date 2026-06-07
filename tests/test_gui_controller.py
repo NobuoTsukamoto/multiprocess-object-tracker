@@ -2,6 +2,7 @@ import sys
 import unittest
 from collections import OrderedDict
 from pathlib import Path
+from queue import Empty
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -27,6 +28,16 @@ class _ProcessStub:
 
     def is_alive(self):
         return self._alive
+
+
+class _QueueStub:
+    def __init__(self, items):
+        self.items = list(items)
+
+    def get_nowait(self):
+        if not self.items:
+            raise Empty
+        return self.items.pop(0)
 
 
 def _make_controller(frame_ids, track_frame_id=None, detections="detections"):
@@ -64,6 +75,12 @@ class GUIControllerTest(unittest.TestCase):
         self.assertEqual(GUIController._calculate_rate([]), 0.0)
         self.assertEqual(GUIController._calculate_rate([1.0]), 0.0)
         self.assertEqual(GUIController._calculate_rate([1.0, 1.5, 2.0]), 2.0)
+
+    def test_drain_queue_nowait_returns_drained_item_count(self):
+        queue = _QueueStub(["old-1", "old-2", "old-3"])
+
+        self.assertEqual(GUIController._drain_queue_nowait(queue), 3)
+        self.assertEqual(queue.items, [])
 
     def test_select_display_frame_prefers_matching_tracking_frame(self):
         controller = _make_controller(frame_ids=[10, 11, 12], track_frame_id=11)
