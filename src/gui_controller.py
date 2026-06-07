@@ -143,6 +143,13 @@ class GUIController:
         except tk.TclError:
             pass
 
+        # overrideredirect removes the title bar, so the window manager no
+        # longer delivers a close affordance (and WM_DELETE_WINDOW/Alt+F4 do
+        # not fire reliably). Bind keyboard fallbacks so the user is never
+        # stuck with a window that can only be closed via Task Manager.
+        self.root.bind("<Escape>", lambda event: self.on_closing())
+        self.root.bind("<Alt-F4>", lambda event: self.on_closing())
+
         x, y, width, height = self._get_work_area_geometry()
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
