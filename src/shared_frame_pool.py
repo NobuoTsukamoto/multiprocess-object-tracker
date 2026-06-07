@@ -15,6 +15,7 @@ Lifecycle:
     once to unlink the segments.
 """
 
+import time
 from dataclasses import dataclass
 from multiprocessing import Queue
 from multiprocessing import shared_memory
@@ -24,6 +25,32 @@ from typing import List, Tuple
 import numpy as np
 
 from data_models import FrameRef
+
+
+# multiprocessing.Queue uses a feeder thread, so an item can be in flight
+# immediately after put_nowait() while get_nowait() still reports Empty.
+# Keep this retry tiny: it smooths over pipe/feeder timing without turning
+# the camera and tracking loops into blocking back-pressure points.
+# With the current values, one helper call can add up to about 2 ms.
+# A writer under slot pressure may call it for free-slot lookup and again
+# for eviction, so the worst-case extra wait is about 4 ms per frame.
+_QUEUE_GET_RETRIES = 2
+_QUEUE_GET_RETRY_DELAY_SEC = 0.001
+
+
+def _get_nowait_with_retry(
+    queue: Queue,
+    retries: int = _QUEUE_GET_RETRIES,
+    delay_sec: float = _QUEUE_GET_RETRY_DELAY_SEC,
+):
+    """Get without materially blocking, tolerating Queue feeder latency."""
+    for attempt in range(retries + 1):
+        try:
+            return queue.get_nowait()
+        except Empty:
+            if attempt >= retries:
+                raise
+            time.sleep(delay_sec)
 
 
 @dataclass
@@ -79,7 +106,7 @@ class SharedFramePool:
         for q in (self.free_queue, self.data_queue):
             while True:
                 try:
-                    q.get_nowait()
+                    _get_nowait_with_retry(q)
                 except Empty:
                     break
         for i in range(len(self.shms)):
@@ -125,11 +152,11 @@ class SharedFrameAccessor:
             return False
 
         try:
-            slot = self.spec.free_queue.get_nowait()
+            slot = _get_nowait_with_retry(self.spec.free_queue)
         except Empty:
             # No free slot: try evicting oldest pending frame.
             try:
-                old: FrameRef = self.spec.data_queue.get_nowait()
+                old: FrameRef = _get_nowait_with_retry(self.spec.data_queue)
                 slot = old.slot
             except Empty:
                 return False  # consumers + queue racing; drop this frame
@@ -199,7 +226,7 @@ class SharedFrameAccessor:
             if max_skip is not None and skipped_count >= max_skip:
                 break
             try:
-                newer: FrameRef = self.spec.data_queue.get_nowait()
+                newer: FrameRef = _get_nowait_with_retry(self.spec.data_queue)
             except Empty:
                 break
             # Discard the older frame: release its slot, keep the newer.

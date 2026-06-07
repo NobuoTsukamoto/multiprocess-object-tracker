@@ -2,13 +2,39 @@ import sys
 import unittest
 from multiprocessing import shared_memory
 from pathlib import Path
-from queue import Queue
+from queue import Empty, Queue
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from data_models import FrameRef
 from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
+
+
+class _FlakyQueue:
+    def __init__(self, get_response=None, get_nowait_responses=None):
+        self.get_response = get_response
+        self.get_nowait_responses = list(get_nowait_responses or [])
+        self.put_items = []
+
+    def get(self, timeout=None):
+        if isinstance(self.get_response, type) and issubclass(
+            self.get_response, Exception
+        ):
+            raise self.get_response
+        return self.get_response
+
+    def get_nowait(self):
+        if not self.get_nowait_responses:
+            raise Empty
+        response = self.get_nowait_responses.pop(0)
+        if isinstance(response, type) and issubclass(response, Exception):
+            raise response
+        return response
+
+    def put_nowait(self, item):
+        self.put_items.append(item)
 
 
 def _make_spec(n_slots=5, shape=(1, 1, 1), dtype="uint8"):
@@ -121,6 +147,69 @@ class SharedFramePoolTest(unittest.TestCase):
             self.assertEqual(next_ref.frame_id, 1)
         finally:
             writer.close()
+            reader.close()
+            _cleanup(shms)
+
+    def test_write_retries_before_dropping_when_evict_queue_looks_empty(self):
+        spec, shms = _make_spec(n_slots=1)
+        spec.free_queue = _FlakyQueue(get_nowait_responses=[Empty, Empty, Empty])
+        spec.data_queue = _FlakyQueue(
+            get_nowait_responses=[
+                Empty,
+                FrameRef(frame_id=1, timestamp=1.0, slot=0),
+            ]
+        )
+        writer = SharedFrameAccessor(spec)
+        try:
+            frame = np.full(spec.shape, 9, dtype=np.uint8)
+
+            self.assertTrue(writer.write(frame, frame_id=2, timestamp=2.0))
+
+            self.assertEqual(writer.views[0].item(), 9)
+            self.assertEqual(len(spec.data_queue.put_items), 1)
+            published = spec.data_queue.put_items[0]
+            self.assertEqual(published.frame_id, 2)
+            self.assertEqual(published.slot, 0)
+        finally:
+            writer.close()
+            _cleanup(shms)
+
+    def test_write_still_drops_after_queue_retry_budget_is_exhausted(self):
+        spec, shms = _make_spec(n_slots=1)
+        spec.free_queue = _FlakyQueue(get_nowait_responses=[Empty, Empty, Empty])
+        spec.data_queue = _FlakyQueue(get_nowait_responses=[Empty, Empty, Empty])
+        writer = SharedFrameAccessor(spec)
+        try:
+            frame = np.full(spec.shape, 9, dtype=np.uint8)
+
+            self.assertFalse(writer.write(frame, frame_id=2, timestamp=2.0))
+            self.assertEqual(spec.data_queue.put_items, [])
+        finally:
+            writer.close()
+            _cleanup(shms)
+
+    def test_read_latest_retries_when_drain_queue_temporarily_looks_empty(self):
+        spec, shms = _make_spec(n_slots=2)
+        spec.data_queue = _FlakyQueue(
+            get_response=FrameRef(frame_id=1, timestamp=1.0, slot=0),
+            get_nowait_responses=[
+                Empty,
+                FrameRef(frame_id=2, timestamp=2.0, slot=1),
+            ],
+        )
+        spec.free_queue = _FlakyQueue()
+        reader = SharedFrameAccessor(spec)
+        try:
+            reader.views[0][...] = 1
+            reader.views[1][...] = 2
+
+            ref, frame, skipped_count = reader.read_latest(timeout=0.1)
+
+            self.assertEqual(ref.frame_id, 2)
+            self.assertEqual(frame.item(), 2)
+            self.assertEqual(skipped_count, 1)
+            self.assertEqual(spec.free_queue.put_items, [0, 1])
+        finally:
             reader.close()
             _cleanup(shms)
 
