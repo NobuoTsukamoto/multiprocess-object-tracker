@@ -1,0 +1,67 @@
+# Tasks — object-tracking-controller
+
+> 逆生成 spec。`src/object_tracking_controller.py` のテストカバレッジ状況と、未文書化挙動・テスト不足・将来改善を列挙する。
+
+## テストカバレッジ状況（逆生成時）
+
+専用テストは**存在しない**（`tests/test_object_tracking_controller.py` 無し）。全要求が未カバー。ONNX/ByteTrack 依存のため、`onnxruntime.InferenceSession` と `sv.ByteTrack` のモック化、または小型ダミーモデルが要る。
+
+| 要求 ID | 対応テスト | 状態 |
+|:--|:--|:--|
+| R-OTC-01〜04（init/ロード） | — | ⬜ 未カバー |
+| R-OTC-05（ONNX 失敗→終了） | — | ⬜ 未カバー |
+| R-OTC-06（ByteTrack 初期化） | — | ⬜ 未カバー |
+| R-OTC-07（アタッチ） | — | ⬜ 未カバー |
+| R-OTC-08（stop までループ） | — | ⬜ 未カバー |
+| R-OTC-09（ポリシー別読み出し） | — | ⬜ 未カバー |
+| R-OTC-10（未知ポリシー→fallback） | — | ⬜ 未カバー |
+| R-OTC-11（Empty→continue） | — | ⬜ 未カバー |
+| R-OTC-12（取得後 stop→break） | — | ⬜ 未カバー |
+| R-OTC-13（input_lag/delta/skipped） | — | ⬜ 未カバー |
+| R-OTC-14（前処理/後処理） | — | ⬜ 未カバー |
+| R-OTC-15（xyxy/スコア） | — | ⬜ 未カバー |
+| R-OTC-16（段階フィルタ） | — | ⬜ 未カバー |
+| R-OTC-17（ByteTrack 更新） | — | ⬜ 未カバー |
+| R-OTC-18（TrackInfo 構築） | — | ⬜ 未カバー |
+| R-OTC-19（TrackingResult 構築） | — | ⬜ 未カバー |
+| R-OTC-20（queue Full→drop-oldest） | — | ⬜ 未カバー |
+| R-OTC-21（PERFORMANCE ログ） | — | ⬜ 未カバー |
+| R-OTC-22（finally 後始末） | — | ⬜ 未カバー |
+| R-OTC-23（ONNX 失敗→GUI 通知） | — | ⬜ 未カバー（改修予定） |
+
+## タスク
+
+### 文書化 / 整合
+- [ ] `score_threshold` が ByteTrack 活性化閾値（生検出フィルタは別の `0.1`）である点を README に注記（config-manager spec と共通）。
+- [ ] 読み出しポリシー（`fifo`/`latest`/`bounded_latest`）と `max_frame_skip` の挙動を README に明記。
+- [ ] YOLOX 前提（`p6=False`、strides `[8,16,32]`）を README/設計に明記。
+
+### テスト
+- [ ] `tests/test_object_tracking_controller.py` を新設（`_preprocess`/`_postprocess`/`_read_frame` は純関数的に単体テスト可能）。
+  - [ ] `_read_frame` が各ポリシーで適切な呼び出しと3-tuple を返すこと（R-OTC-09）。
+  - [ ] 未知ポリシーで warning＋bounded_latest フォールバック（R-OTC-10）。
+  - [ ] `_preprocess` の出力形状/dtype/ratio（R-OTC-14）。
+  - [ ] 段階フィルタ（confidence/NMS/class/area）の境界（R-OTC-16）。
+  - [ ] `track_queue` Full 時の drop-oldest（R-OTC-20）。
+  - [ ] ONNX ロード失敗で早期 return（R-OTC-05、`InferenceSession` モック）。
+
+### 実装（✅確定）
+- [ ] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え GUI へ通知。通知機構は camera-controller R-CAM-14 と**共通**（専用 Event か Queue、gui-controller spec で確定）。コンストラクタ引数追加と GUI 側ハンドリングを併せて実装。
+- [ ] **検出閾値の設定化**（config-manager で決定）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold` に差し替え（`object_tracking_controller.py:189-190`）。
+
+### 実装 / 改善（将来）
+- [ ] **他モデル対応**（将来）: YOLOX 固定（`p6=False`、strides `[8,16,32]`、`scores=obj×cls`）を脱し、他検出モデル/他ストライド構成に対応。今回は対象外（当面 YOLOX 固定で確定）。
+- [ ] `input_name = session.get_inputs()[0].name` をループ外へ巻き上げ（`:161`、軽微な最適化）。
+- [ ] 例外耐性: 推論中の例外（不正フレーム等）を握って継続するか、致命扱いにするかの方針明文化。
+- [ ] 型注釈の補強（`_read_frame`/`_preprocess`/`_postprocess` の戻り値型）。
+
+## メモ / 申し送り
+
+- ✅ ONNX ロード失敗は **GUI へ通知**（R-OTC-23、camera R-CAM-14 と同一機構、機構は gui-controller spec で確定）。
+- ✅ 当面 **YOLOX 固定**で進める（他モデル対応は将来）。
+- 🔁 **他 spec 確定の反映**: `0.1`/`0.45` は config-manager で `detection_threshold`/`nms_iou_threshold` にキー化決定済み。本モジュールで消費差し替え。
+- 🔎 `_read_frame` は `read`(2-tuple)/`read_latest`(3-tuple) を `(frame_ref, image, skipped)` に正規化（`fifo` は skip=0）。
+- 🔎 検出フィルタ順は confidence→NMS→class→area。NMS はクラス選別前に全体へ適用。
+- 🔎 空検出/`tracker_id` None でも `TrackingResult` は送出（`track_infos` 空）。
+- 🔎 レイテンシ恒等式 `total == queue + process`（data-models spec と共通）。
+- 専用テスト皆無。純関数寄りの `_preprocess`/`_postprocess`/`_read_frame` から着手するのが費用対効果が高い。
