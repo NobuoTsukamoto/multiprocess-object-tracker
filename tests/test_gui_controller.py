@@ -32,6 +32,7 @@ class _ProcessStub:
 def _make_controller(frame_ids, track_frame_id=None, detections="detections"):
     controller = object.__new__(GUIController)
     controller._frame_buffer = OrderedDict((fid, f"frame-{fid}") for fid in frame_ids)
+    controller._frame_timestamps = OrderedDict((fid, float(fid)) for fid in frame_ids)
     controller._frame_buffer_max = 10
     controller._overlay_miss_count = 0
     controller._last_overlay_miss_frame_id = None
@@ -58,6 +59,11 @@ class GUIControllerTest(unittest.TestCase):
             ),
             12,
         )
+
+    def test_calculate_rate_uses_elapsed_between_samples(self):
+        self.assertEqual(GUIController._calculate_rate([]), 0.0)
+        self.assertEqual(GUIController._calculate_rate([1.0]), 0.0)
+        self.assertEqual(GUIController._calculate_rate([1.0, 1.5, 2.0]), 2.0)
 
     def test_select_display_frame_prefers_matching_tracking_frame(self):
         controller = _make_controller(frame_ids=[10, 11, 12], track_frame_id=11)

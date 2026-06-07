@@ -199,7 +199,9 @@ class ObjectTrackingController(multiprocessing.Process):
                         )
                         track_results.append(track_info)
 
-                process_time_ms = (time.time() - start_time) * 1000
+                end_time = time.time()
+                process_time_ms = (end_time - start_time) * 1000
+                total_latency_ms = (end_time - frame_ref.timestamp) * 1000
 
                 tracking_result = TrackingResult(
                     frame_id=frame_ref.frame_id,
@@ -207,6 +209,8 @@ class ObjectTrackingController(multiprocessing.Process):
                     track_infos=track_results,
                     detections=tracked_detections,
                     process_time_ms=process_time_ms,
+                    queue_latency_ms=last_input_lag_ms,
+                    total_latency_ms=total_latency_ms,
                 )
 
                 try:
