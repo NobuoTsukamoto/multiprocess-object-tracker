@@ -19,6 +19,9 @@ from logger import Logger
 from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
 
 
+FRAME_READ_TIMEOUT_SEC = 0.1
+
+
 class ObjectTrackingController(multiprocessing.Process):
     def __init__(
         self,
@@ -43,22 +46,24 @@ class ObjectTrackingController(multiprocessing.Process):
         policy = getattr(self.track_config, "frame_read_policy", "bounded_latest")
 
         if policy == "fifo":
-            frame_ref, image = frame_pool.read(timeout=1.0)
+            frame_ref, image = frame_pool.read(timeout=FRAME_READ_TIMEOUT_SEC)
             return frame_ref, image, 0
 
         if policy == "latest":
-            return frame_pool.read_latest(timeout=1.0)
+            return frame_pool.read_latest(timeout=FRAME_READ_TIMEOUT_SEC)
 
         if policy == "bounded_latest":
             max_skip = max(0, int(getattr(self.track_config, "max_frame_skip", 2)))
-            return frame_pool.read_latest(timeout=1.0, max_skip=max_skip)
+            return frame_pool.read_latest(
+                timeout=FRAME_READ_TIMEOUT_SEC, max_skip=max_skip
+            )
 
         if self.logger is not None:
             self.logger.warning(
                 f"Unknown frame_read_policy '{policy}'; using bounded_latest."
             )
         max_skip = max(0, int(getattr(self.track_config, "max_frame_skip", 2)))
-        return frame_pool.read_latest(timeout=1.0, max_skip=max_skip)
+        return frame_pool.read_latest(timeout=FRAME_READ_TIMEOUT_SEC, max_skip=max_skip)
 
     def _preprocess(self, img: np.ndarray, input_size: tuple, swap=(2, 0, 1)):
         if len(img.shape) == 3:
@@ -137,6 +142,8 @@ class ObjectTrackingController(multiprocessing.Process):
                     frame_ref, image, skipped_count = self._read_frame(frame_pool)
                 except Empty:
                     continue
+                if self.stop_event.is_set():
+                    break
 
                 start_time = time.time()
                 last_skipped_count = skipped_count
