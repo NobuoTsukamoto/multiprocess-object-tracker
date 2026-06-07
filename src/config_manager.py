@@ -33,6 +33,8 @@ class TrackingConfig:
     min_box_area: int = 100
     iou_threshold: float = 0.5
     max_track_num: int = 10
+    frame_read_policy: str = "bounded_latest"
+    max_frame_skip: int = 2
 
 
 @dataclass
@@ -43,6 +45,7 @@ class GuiConfig:
     window_y: int = 100
     display_image_width: int = 1280
     display_image_height: int = 720
+    frame_buffer_seconds: float = 2.0
 
 
 @dataclass

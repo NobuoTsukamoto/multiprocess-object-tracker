@@ -38,6 +38,28 @@ class ObjectTrackingController(multiprocessing.Process):
         self.stop_event = stop_event
         self.logger = None
 
+    def _read_frame(self, frame_pool: SharedFrameAccessor):
+        """Read a frame using the configured latency/quality policy."""
+        policy = getattr(self.track_config, "frame_read_policy", "bounded_latest")
+
+        if policy == "fifo":
+            frame_ref, image = frame_pool.read(timeout=1.0)
+            return frame_ref, image, 0
+
+        if policy == "latest":
+            return frame_pool.read_latest(timeout=1.0)
+
+        if policy == "bounded_latest":
+            max_skip = max(0, int(getattr(self.track_config, "max_frame_skip", 2)))
+            return frame_pool.read_latest(timeout=1.0, max_skip=max_skip)
+
+        if self.logger is not None:
+            self.logger.warning(
+                f"Unknown frame_read_policy '{policy}'; using bounded_latest."
+            )
+        max_skip = max(0, int(getattr(self.track_config, "max_frame_skip", 2)))
+        return frame_pool.read_latest(timeout=1.0, max_skip=max_skip)
+
     def _preprocess(self, img: np.ndarray, input_size: tuple, swap=(2, 0, 1)):
         if len(img.shape) == 3:
             padded_img = (
@@ -104,15 +126,26 @@ class ObjectTrackingController(multiprocessing.Process):
 
         frame_count = 0
         perf_start_time = time.time()
+        last_input_frame_id = None
+        last_skipped_count = 0
+        last_input_lag_ms = 0.0
+        last_frame_id_delta = 0
         try:
             while not self.stop_event.is_set():
                 try:
                     frame_ref: FrameRef
-                    frame_ref, image = frame_pool.read(timeout=1.0)
+                    frame_ref, image, skipped_count = self._read_frame(frame_pool)
                 except Empty:
                     continue
 
                 start_time = time.time()
+                last_skipped_count = skipped_count
+                last_input_lag_ms = (start_time - frame_ref.timestamp) * 1000
+                if last_input_frame_id is None:
+                    last_frame_id_delta = 0
+                else:
+                    last_frame_id_delta = frame_ref.frame_id - last_input_frame_id
+                last_input_frame_id = frame_ref.frame_id
 
                 # Preprocess
                 preprocessed_image, ratio = self._preprocess(image, input_shape)
@@ -202,7 +235,10 @@ class ObjectTrackingController(multiprocessing.Process):
                         "PERFORMANCE",
                         f"frame={frame_count} | "
                         f"process_time={process_time_ms:.2f}ms | "
-                        f"avg_fps={avg_fps:.2f}",
+                        f"avg_fps={avg_fps:.2f} | "
+                        f"frame_id_delta={last_frame_id_delta} | "
+                        f"skipped={last_skipped_count} | "
+                        f"input_lag={last_input_lag_ms:.2f}ms",
                     )
                     perf_start_time = time.time()
         finally:

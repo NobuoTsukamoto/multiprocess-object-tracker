@@ -4,6 +4,7 @@ This software is released under the MIT License.
 See the LICENSE file in the project root for more information.
 """
 
+import math
 import multiprocessing
 import time
 import tkinter as tk
@@ -24,6 +25,13 @@ from shared_frame_pool import SharedFrameAccessor, SharedFramePool
 
 
 class GUIController:
+    @staticmethod
+    def _calculate_frame_buffer_max(
+        fps: int, frame_buffer_seconds: float, minimum: int
+    ) -> int:
+        buffered_frames = math.ceil(max(0, fps) * max(0.0, frame_buffer_seconds))
+        return max(minimum, buffered_frames)
+
     def __init__(self, config_manager: ConfigManager, logger: Logger):
         self.config_manager = config_manager
         self.logger = logger.get_logger()
@@ -81,8 +89,14 @@ class GUIController:
 
         # Recent frames keyed by frame_id, for synchronized overlay.
         self._frame_buffer: "OrderedDict[int, any]" = OrderedDict()
-        self._frame_buffer_max = max_queue_size + 2
+        self._frame_buffer_max = self._calculate_frame_buffer_max(
+            fps=self.camera_config.fps,
+            frame_buffer_seconds=self.gui_config.frame_buffer_seconds,
+            minimum=max_queue_size + 2,
+        )
         self._latest_track: TrackingResult = None
+        self._overlay_miss_count = 0
+        self._last_overlay_miss_frame_id = None
 
         # Supervision Annotators
         self.box_annotator = sv.BoxAnnotator()
@@ -157,8 +171,20 @@ class GUIController:
             self.stop_event,
         )
 
-        self.camera_process.start()
-        self.tracking_process.start()
+        self.tracking_pool.mark_active()
+        self.gui_pool.mark_active()
+        try:
+            self.camera_process.start()
+            self.tracking_process.start()
+        except Exception:
+            self.stop_event.set()
+            self._terminate_process_if_alive(self.camera_process, "CameraController")
+            self._terminate_process_if_alive(
+                self.tracking_process, "ObjectTrackingController"
+            )
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+            raise
 
         self.start_button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
@@ -168,23 +194,55 @@ class GUIController:
         self.logger.info("Stopping tracking processes...")
         self.stop_event.set()
 
-        if self.camera_process:
-            self.camera_process.join(timeout=5)
-            if self.camera_process.is_alive():
-                self.logger.warning(
-                    "CameraController did not terminate gracefully. Terminating."
-                )
-                self.camera_process.terminate()
-        if self.tracking_process:
-            self.tracking_process.join(timeout=5)
-            if self.tracking_process.is_alive():
-                self.logger.warning(
-                    "ObjectTrackingController did not terminate gracefully. Terminating."
-                )
-                self.tracking_process.terminate()
+        camera_stopped = self._stop_process(self.camera_process, "CameraController")
+        tracking_stopped = self._stop_process(
+            self.tracking_process, "ObjectTrackingController"
+        )
+        if camera_stopped and tracking_stopped:
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+        else:
+            self.logger.error(
+                "Some worker processes are still alive; shared frame pools remain "
+                "active and cannot be reset safely."
+            )
+            self.start_button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.NORMAL)
 
-        self.start_button.config(state=tk.NORMAL)
-        self.stop_button.config(state=tk.DISABLED)
+    def _stop_process(self, process, process_name: str) -> bool:
+        if process is None:
+            return True
+
+        process.join(timeout=5)
+        if process.is_alive():
+            self.logger.warning(
+                f"{process_name} did not terminate gracefully. Terminating."
+            )
+            self._terminate_process_if_alive(process, process_name)
+
+        return not process.is_alive()
+
+    def _terminate_process_if_alive(self, process, process_name: str):
+        if process is None or not process.is_alive():
+            return
+
+        process.terminate()
+        process.join(timeout=2)
+        if process.is_alive():
+            self.logger.error(
+                f"{process_name} is still alive after terminate(); killing."
+            )
+            process.kill()
+            process.join(timeout=2)
+            if process.is_alive():
+                self.logger.error(f"{process_name} is still alive after kill().")
+    def _workers_alive(self) -> bool:
+        return any(
+            process is not None and process.is_alive()
+            for process in (self.camera_process, self.tracking_process)
+        )
 
     def _drain_frames(self):
         """Pull every available frame out of the GUI pool and buffer it."""
@@ -242,10 +300,36 @@ class GUIController:
                 while self._frame_buffer and next(iter(self._frame_buffer)) < fid:
                     self._frame_buffer.popitem(last=False)
                 return self._frame_buffer[fid], self._latest_track.detections
+            self._record_overlay_miss_if_stale(fid)
 
         # Fall back to newest frame, no overlay.
         newest_fid = next(reversed(self._frame_buffer))
         return self._frame_buffer[newest_fid], None
+
+    def _record_overlay_miss_if_stale(self, track_frame_id: int):
+        """Log once when a tracking result is older than the GUI frame buffer."""
+        if not self._frame_buffer:
+            return
+
+        oldest_fid = next(iter(self._frame_buffer))
+        if track_frame_id >= oldest_fid:
+            return
+
+        if self._last_overlay_miss_frame_id == track_frame_id:
+            return
+
+        newest_fid = next(reversed(self._frame_buffer))
+        self._overlay_miss_count += 1
+        self._last_overlay_miss_frame_id = track_frame_id
+        self.logger.warning(
+            "Overlay miss: "
+            f"track_frame_id={track_frame_id}, "
+            f"oldest_buffered_frame_id={oldest_fid}, "
+            f"newest_buffered_frame_id={newest_fid}, "
+            f"buffer_size={len(self._frame_buffer)}, "
+            f"buffer_limit={self._frame_buffer_max}, "
+            f"miss_count={self._overlay_miss_count}"
+        )
 
     def _update_gui(self):
         self._drain_frames()
@@ -295,15 +379,24 @@ class GUIController:
             self.root.after(5, self._update_gui)
 
     def on_closing(self):
-        if self.camera_process and self.camera_process.is_alive():
+        if self._workers_alive():
             self.stop_tracking()
         # Release shared memory.
         try:
             self.gui_pool_reader.close()
         except Exception:
             pass
-        self.tracking_pool.cleanup()
-        self.gui_pool.cleanup()
+
+        if self._workers_alive():
+            self.logger.error(
+                "Skipping shared memory cleanup because worker processes are "
+                "still alive."
+            )
+        else:
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+            self.tracking_pool.cleanup()
+            self.gui_pool.cleanup()
         self.root.destroy()
 
     def run(self):

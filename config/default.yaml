@@ -1,5 +1,5 @@
 camera:
-  fps: 30
+  fps: 15
   width: 1280
   height: 720
   max_queue_length: 10
@@ -25,6 +25,8 @@ tracking:
   min_box_area: 100
   iou_threshold: 0.5
   max_track_num: 10
+  frame_read_policy: bounded_latest # fifo, latest, or bounded_latest
+  max_frame_skip: 2 # Used by bounded_latest
 
 gui:
   window_width: 1600
@@ -33,6 +35,7 @@ gui:
   window_y: 100
   display_image_width: 1280
   display_image_height: 720
+  frame_buffer_seconds: 2.0 # Keep frames long enough to match delayed tracking results
 
 logging:
   level: "INFO"
