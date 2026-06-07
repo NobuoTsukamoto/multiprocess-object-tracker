@@ -1,11 +1,7 @@
-import sys
 import unittest
 from collections import OrderedDict
-from pathlib import Path
 from queue import Empty
 from types import SimpleNamespace
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from gui_controller import GUIController
 

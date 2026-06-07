@@ -1,12 +1,8 @@
-import sys
 import unittest
 from multiprocessing import shared_memory
-from pathlib import Path
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 
 import numpy as np
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data_models import FrameRef
 from shared_frame_pool import SharedFrameAccessor, SharedFramePool, SharedFrameSpec
@@ -35,6 +31,11 @@ class _FlakyQueue:
 
     def put_nowait(self, item):
         self.put_items.append(item)
+
+
+class _FullOnPutQueue(_FlakyQueue):
+    def put_nowait(self, item):
+        raise Full
 
 
 def _make_spec(n_slots=5, shape=(1, 1, 1), dtype="uint8"):
@@ -205,6 +206,21 @@ class SharedFramePoolTest(unittest.TestCase):
 
             self.assertFalse(writer.write(frame, frame_id=2, timestamp=2.0))
             self.assertEqual(spec.data_queue.put_items, [])
+        finally:
+            writer.close()
+            _cleanup(shms)
+
+    def test_write_returns_slot_to_free_pool_when_publish_queue_is_full(self):
+        spec, shms = _make_spec(n_slots=1)
+        spec.free_queue = _FlakyQueue(get_nowait_responses=[0])
+        spec.data_queue = _FullOnPutQueue()
+        writer = SharedFrameAccessor(spec)
+        try:
+            frame = np.full(spec.shape, 9, dtype=np.uint8)
+
+            self.assertFalse(writer.write(frame, frame_id=2, timestamp=2.0))
+
+            self.assertEqual(spec.free_queue.put_items, [0])
         finally:
             writer.close()
             _cleanup(shms)

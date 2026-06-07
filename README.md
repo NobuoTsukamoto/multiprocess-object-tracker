@@ -180,6 +180,20 @@ python_multiprocessing_example/
 └── requirements.txt
 ```
 
+## テスト
+
+テストフレームワークは`pytest`を採用します。既存の`unittest`形式のテストもpytestから実行し、新規テストはpytest形式で追加します。
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+優先してテストするエッジケース:
+- 設定ファイルの一部セクション欠落、空YAML、未知セクション参照
+- 共有メモリフレームプールのキュー満杯、スロット返却、最新フレーム読み出し
+- GUIのフレームバッファと追跡結果の同期ずれ
+- 追跡処理のフレーム読み出し方針(`fifo`、`latest`、`bounded_latest`、未知値)
+
 ## 開発言語と利用するOSS
 
 ### 開発言語

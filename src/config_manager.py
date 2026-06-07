@@ -70,7 +70,7 @@ class ConfigManager:
 
     def _load_config(self, config_path: str) -> AppConfig:
         with open(config_path, "r") as f:
-            config_dict = yaml.safe_load(f)
+            config_dict = yaml.safe_load(f) or {}
         return self._create_app_config(config_dict)
 
     def _create_app_config(self, config_dict: Dict[str, Any]) -> AppConfig:
