@@ -26,7 +26,7 @@
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-SFP-01 | ユビキタス | owner はメインプロセスで N スロットの共有メモリ・free_queue（全スロット番号を充填）・data_queue を生成すること。 | `shared_frame_pool.py:70-89` | — |
+| R-SFP-01 | ユビキタス | owner はメインプロセスで N スロットの共有メモリと free_queue（全スロット番号を充填）を生成すること。data_queue は生成せず、コンストラクタ引数として呼び出し側（消費側 Queue の所有者）から受け取ること。 | `shared_frame_pool.py:70-89` | — |
 | R-SFP-02 | ユビキタス | owner は `spec` プロパティで、サブプロセスがアタッチ可能な `SharedFrameSpec`（共有メモリ名・shape・dtype・両 Queue）を提供すること。 | `shared_frame_pool.py:91-99` | 間接 (`_make_spec`) |
 | R-SFP-03 | ユビキタス | accessor は受け取った spec の共有メモリにアタッチし、各スロットに対する numpy view を保持すること。 | `shared_frame_pool.py:156-164` | — |
 
@@ -34,17 +34,18 @@
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-SFP-04 | 異常系 | 書き込むフレームの shape がプールの shape と一致しないとき、システムは書き込みを行わず False を返すこと。 | `shared_frame_pool.py:175-177` | — |
+| R-SFP-04 | 異常系 | 書き込むフレームの shape がプールの shape と一致しないとき、システムは書き込みを行わず False を返すこと。shape チェックは slot 取得（`:180`）より前に行われるため、**スロットを消費しない**（free_queue は不変）。 | `shared_frame_pool.py:175-177,180` | — |
 | R-SFP-05 | イベント駆動 | 空きスロットがあるとき、システムはフレームを当該スロットへコピーし、`FrameRef` を data_queue に publish して True を返すこと。 | `shared_frame_pool.py:180,189-194` | `test_write_retries_before_dropping...` |
 | R-SFP-06 | イベント駆動 | 空きスロットが無いとき、システムは data_queue 先頭（最古）の `FrameRef` を取り出してそのスロットを再利用すること（evict-oldest）。 | `shared_frame_pool.py:181-185` | `test_write_retries_before_dropping...` |
 | R-SFP-07 | 異常系 | 空きスロットも退避可能な保留フレームも無いとき、システムはフレームを破棄し False を返すこと。 | `shared_frame_pool.py:186-187` | `test_write_still_drops_after_queue_retry...` |
-| R-SFP-08 | 異常系 | フレームコピー後に data_queue への publish が満杯で失敗したとき、システムは確保したスロットを free_queue へ戻し False を返すこと。 | `shared_frame_pool.py:195-201` | — |
+| R-SFP-08 | 異常系 | フレームは publish 前に確保スロットへコピー済み（`:189`）であり、その後 data_queue への publish が満杯で失敗したとき、システムは確保したスロットを free_queue へ戻し False を返すこと（戻したスロットには未publishの古いデータが残るが free として再利用されるため実害なし）。 | `shared_frame_pool.py:189,195-201` | — |
 
 ### 読み出し（reader 側）
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
 | R-SFP-09 | イベント駆動 | `read(timeout)` は最大 timeout 秒ブロックして次の `FrameRef` を取得し、フレームのコピーを返してスロットを free_queue へ戻すこと。タイムアウト時は `queue.Empty` を送出すること。 | `shared_frame_pool.py:204-218` | — |
+| R-SFP-09b | イベント駆動 | `read_nowait()` は data_queue を非ブロックで取得し、データが無ければ即座に `queue.Empty` を送出すること。取得時はフレームのコピーを返し、スロットを free_queue へ戻すこと。 | `shared_frame_pool.py:220-227` | `test_read_latest_can_bound_skipped_frames`（間接利用） |
 | R-SFP-10 | ユビキタス | 読み出しが返すフレームは view のコピーであり、スロットは戻り値返却前に解放されるため、呼び出し側は返却 ndarray を無期限に保持してよいこと。 | `shared_frame_pool.py:213-218` | — |
 | R-SFP-11 | イベント駆動 | `read_latest(timeout)` は最初の `FrameRef` を最大 timeout 秒待ち、その後ブロックせず後続をドレインして、スキップした古いフレームのスロットを解放し、選ばれたフレームとスキップ数を返すこと。 | `shared_frame_pool.py:229-271` | `test_read_latest_returns_skipped_count...` |
 | R-SFP-12 | オプション | `read_latest` の `max_skip` が None のとき、システムは保留中の全フレームをスキップし最新のみ返すこと（latest）。 | `shared_frame_pool.py:251-264` | `test_read_latest_returns_skipped_count...` |
@@ -72,7 +73,7 @@
 - **P-SFP-02**: スロットは free_queue と data_queue のいずれか一方にのみ存在する（二重所有しない）。書き込みは free→data、読み出しは data→free へ受け渡す。出典 `shared_frame_pool.py:180-200,212-218,255-270`。
 - **P-SFP-03**: 共有メモリの生成・unlink は owner が一度だけ行い、accessor は close のみ（unlink しない）。出典 `shared_frame_pool.py:140-150,273-280`。
 
-## 未確定 / 要レビュー事項
+## 決定事項（レビュー済み）
 
-- [ ] R-SFP-15 のリトライ予算（2 回 / 1ms）は worst-case で 1 フレームあたり約 4ms の追加待ちになり得る（writer が free 探索と eviction で 2 回呼ぶため）。この上限が許容範囲かは運用 FPS 次第 — 出典コメント `shared_frame_pool.py:30-38`。
-- [ ] `read_nowait()`（`shared_frame_pool.py:220-227`）は要求として明示していない（`read` の非ブロック版）。spec 化要否をレビューで判断。
+- **R-SFP-15 のリトライ予算は許容**: worst-case で約 4ms/frame の追加待ち（writer が free 探索と eviction で 2 回呼ぶため）になり得るが、**設計上の上限を 30FPS**（フレーム周期 33.3ms に対し約 12%）までとし許容と判断。発生は feeder 遅延とスロット逼迫が重なる稀ケースに限られる。高 FPS（≳60）運用時はリトライ予算の設定化を検討（tasks.md「実装/改善」に既出）。出典コメント `shared_frame_pool.py:30-38`。
+- **`read_nowait()` は spec 化済み**: 公開 API かつテストで実利用のため R-SFP-09b として要求一覧に追加（`shared_frame_pool.py:220-227`）。

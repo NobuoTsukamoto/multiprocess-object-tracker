@@ -16,7 +16,8 @@
 | R-SFP-04（shape 不一致） | — | ⬜ 未カバー |
 | R-SFP-08（publish Full で slot 返却） | — | ⬜ 未カバー |
 | R-SFP-09, R-SFP-10（read のブロック/timeout/コピー） | — | ⬜ 未カバー |
-| R-SFP-18, R-SFP-19（cleanup/close） | — | ⬜ 未カバー |
+| R-SFP-19（accessor close） | — | ⬜ 未カバー |
+| R-SFP-18（owner cleanup） | — | ⛔ テスト対象外（low priority。二重 unlink でリソーストラッカ警告が出る環境があり、close+unlink の実テストは扱いづらい） |
 
 ## タスク
 
@@ -24,7 +25,12 @@
 - [x] requirements/design を逆生成（出典 `file:line` 付き）
 - [x] 人手レビュー: evict-oldest（`:179-201`）/ read_latest の max_skip 分岐（`:246-264`）/ reset 前提（`:125-129`）をコードと突合
   - 反映: 単一 writer 前提（evict-oldest）と `_active` の管理責任を design「不変条件 / 前提条件」に追記
-- [ ] `read_nowait()`（`:220-227`）を要求として spec 化するか判断
+- [x] 人手レビュー: 未カバー要求 R-SFP-04 / 08 / 09 / 10 をコードと突合（記述とコードは一致）
+  - 反映: R-SFP-04 に「shape チェックは slot 取得前＝スロット未消費」、R-SFP-08 に「コピー先行」の含意を追記。R-SFP-18 をテスト対象外に分類
+- [x] 人手レビュー: 基礎要求 R-SFP-01 / 02 / 03 をコードと突合
+  - 反映: R-SFP-01 の誤り（data_queue は owner 生成ではなく呼び出し側から注入）を requirements / design 双方で訂正。R-SFP-02 / 03 は一致
+- [x] `read_nowait()`（`:220-227`）を要求として spec 化するか判断 → R-SFP-09b として spec 化
+- [x] R-SFP-15 リトライ予算の許容判断 → 30FPS まで許容（高FPS時は設定化検討）として決定事項に確定
 
 ### テスト（未カバー要求の補完）
 - [ ] R-SFP-04: shape 不一致で `write` が False を返すことのテスト
