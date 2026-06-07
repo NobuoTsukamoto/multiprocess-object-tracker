@@ -231,8 +231,13 @@ class GUIController:
         process.terminate()
         process.join(timeout=2)
         if process.is_alive():
-            self.logger.error(f"{process_name} is still alive after terminate().")
-
+            self.logger.error(
+                f"{process_name} is still alive after terminate(); killing."
+            )
+            process.kill()
+            process.join(timeout=2)
+            if process.is_alive():
+                self.logger.error(f"{process_name} is still alive after kill().")
     def _workers_alive(self) -> bool:
         return any(
             process is not None and process.is_alive()
