@@ -51,7 +51,7 @@
 | R-OTC-20 | 異常系 | `track_queue` への `put_nowait` が `Full` のとき、システムは最古の結果を捨てて再 put し、なお `Full` なら warning をログ（ドロップ）すること。 | `src/object_tracking_controller.py:223-235` | — |
 | R-OTC-21 | イベント駆動 | `performance_interval` フレームごとに、システムは PERFORMANCE レベルで frame/process_time/avg_fps/frame_id_delta/skipped/input_lag をログすること。 | `src/object_tracking_controller.py:237-254` | — |
 | R-OTC-22 | イベント駆動 | ループ終了時（`finally`）、システムは `frame_pool` を `close` し停止 info をログすること。 | `src/object_tracking_controller.py:255-257` | — |
-| R-OTC-23 | 異常系 | ONNX ロードに失敗したとき、システムは GUI へロード失敗を通知すること（**改修予定**。現状は error ログ＋return のみ）。通知機構は camera-controller R-CAM-14 と共通とする。 | `src/object_tracking_controller.py:119-121` | — |
+| R-OTC-23 | 異常系 | ONNX ロードに失敗したとき、システムは GUI へロード失敗を**専用エラーとして通知**すること（**改修予定・機構確定**。現状は error ログ＋return のみ）。GUI 側は専用エラー状態を表示する（[`gui-controller`](../gui-controller/) R-GUI-44）。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue 推奨**、最終形は実装時確定）。 | `src/object_tracking_controller.py:119-121` | — |
 
 ## 前提条件 / 不変条件
 
@@ -64,12 +64,12 @@
 
 ## 確定事項（レビュー反映済み）
 
-- ✅ **ONNX ロード失敗は GUI へ通知（エラー扱い、R-OTC-23）**: 現状は error ログ＋`return` のみ（`object_tracking_controller.py:119-121`）だが、camera-controller の R-CAM-14（open 失敗通知）と**同一機構**で GUI へ通知する。通知機構（専用 `Event` か ステータス Queue か）は camera と共通化し、gui-controller spec で確定する。
+- ✅ **ONNX ロード失敗は GUI へ通知（エラー扱い・機構確定、R-OTC-23）**: 現状は error ログ＋`return` のみ（`object_tracking_controller.py:119-121`）だが、camera-controller の R-CAM-14（open 失敗通知）と**同一の専用通知**で GUI へ通知し、GUI は専用エラー状態を表示する（[`gui-controller`](../gui-controller/) R-GUI-44 で確定）。通知機構はエラー内容を運べる**ステータス Queue を推奨**（最終形は実装時に 3 モジュール横断で確定）。
 - ✅ **当面 YOLOX 固定で進める**: `p6=False`・strides `[8,16,32]`・`scores=obj×cls` の YOLOX 前提を当面の正式スコープとする。他モデル対応は将来の拡張テーマとして tasks に残す（今回は実装しない）。
 - ✅ **検出フィルタ閾値の設定化（他 spec 確定の反映）**: confidence `>0.1`（`:189`）・NMS IoU `0.45`（`:190`）は [`config-manager`](../config-manager/) で `detection.detection_threshold`/`detection.nms_iou_threshold` へキー化決定済み。本モジュールで消費側を設定値へ差し替える（タスク化）。
 
 ## 未確定 / 要レビュー事項
 
-- [ ] **GUI 通知機構の選択**: ONNX ロード失敗通知（R-OTC-23）を専用 `multiprocessing.Event` で行うか、ステータス Queue でエラー内容を送るか。camera-controller R-CAM-14 と共通化し、gui-controller spec で確定する。
+- （解消済み）GUI 通知機構の選択 → [`gui-controller`](../gui-controller/) R-GUI-44 で方針確定（専用エラー通知＋GUI 表示、**ステータス Queue 推奨**、camera/tracking 共通）。最終的な実装形（Event か Queue か）は実装時に 3 モジュール横断で確定する。
 - [ ] **`input_name` をループ内で毎回取得**: `session.get_inputs()[0].name` を反復ごとに呼ぶ（`:161`）。ループ外へ巻き上げ可能（軽微な最適化、tasks 将来改善）。
 - [ ] **空検出/`tracker_id` None の意図確認**: フィルタ後に検出ゼロ、または `tracker_id is None` のとき `track_infos` は空のまま `TrackingResult` を送出する。意図どおりか確認。出典 `src/object_tracking_controller.py:199-207`。

@@ -43,7 +43,7 @@
 
 ### 実装（✅確定）
 - [ ] **カメラソースの設定キー化**（R-CAM-13a〜d、ルールB確定）: `CameraConfig` に `source`（既定 `0`、int or str）を追加。解釈ヘルパを実装（int→そのまま / `^\d+$` 文字列→`int()` / それ以外の文字列→そのまま）し `cv2.VideoCapture(resolved)` へ。`config/default.yaml`・README・config-manager spec も同期。
-- [ ] **オープン失敗の GUI 通知**（R-CAM-14）: 専用 `Event` or ステータス Queue で GUI に通知。コンストラクタ引数の追加と GUI 側のハンドリング（エラー表示）を併せて実装。機構は要確認。
+- [ ] **オープン失敗の GUI 通知**（R-CAM-14、機構確定）: [`gui-controller`](../gui-controller/) R-GUI-44 と**共通の専用通知**で GUI に通知（**ステータス Queue 推奨**、tracking R-OTC-23 と共通）。コンストラクタ引数の追加と GUI 側のハンドリング（専用エラー表示）を併せて実装。最終形は実装時に 3 モジュール横断で確定。
 - [ ] **チャンネル不一致の error ドロップ**（R-CAM-15）: resize 後に `frame.shape != expected_shape` を明示チェックし、error ログ＋`continue`（書き込みスキップ）。
 - [ ] grab 連続失敗は無限リトライのまま（R-CAM-07、変更不要）。
 
@@ -54,7 +54,7 @@
 ## メモ / 申し送り
 
 - ✅ カメラソースは `camera.source`（キー名確定）で設定キー化。型解釈は**ルールB**（int / 数字文字列→int / それ以外→パスURL）で確定（R-CAM-13a〜d）。
-- ✅ open 失敗は GUI へ通知（R-CAM-14、機構は Event か Queue か要確認）。
+- ✅ open 失敗は GUI へ専用エラー通知（R-CAM-14、gui R-GUI-44 と共通・ステータス Queue 推奨、最終形は実装時確定）。
 - ✅ grab 連続失敗は無限リトライのまま（R-CAM-07、仕様確定）。
 - ✅ チャンネル不一致は error ログ＋ドロップ（R-CAM-15）。
 - 🔎 両プールは GUI が同一 `frame_shape` で生成するため、`tracking_pool.shape` 基準のリサイズで GUI 用にも適合する（前提が崩れると GUI 用がドロップする）。

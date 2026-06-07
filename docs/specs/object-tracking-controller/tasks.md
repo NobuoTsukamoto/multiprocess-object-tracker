@@ -46,7 +46,7 @@
   - [ ] ONNX ロード失敗で早期 return（R-OTC-05、`InferenceSession` モック）。
 
 ### 実装（✅確定）
-- [ ] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え GUI へ通知。通知機構は camera-controller R-CAM-14 と**共通**（専用 Event か Queue、gui-controller spec で確定）。コンストラクタ引数追加と GUI 側ハンドリングを併せて実装。
+- [ ] **ONNX ロード失敗の GUI 通知**（R-OTC-23、機構確定）: error ログに加え GUI へ**専用エラー通知**。通知機構は camera-controller R-CAM-14 / [`gui-controller`](../gui-controller/) R-GUI-44 と**共通**（**ステータス Queue 推奨**、最終形は実装時確定）。コンストラクタ引数追加と GUI 側ハンドリング（専用エラー表示）を併せて実装。
 - [ ] **検出閾値の設定化**（config-manager で決定）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold` に差し替え（`object_tracking_controller.py:189-190`）。
 
 ### 実装 / 改善（将来）
@@ -57,7 +57,7 @@
 
 ## メモ / 申し送り
 
-- ✅ ONNX ロード失敗は **GUI へ通知**（R-OTC-23、camera R-CAM-14 と同一機構、機構は gui-controller spec で確定）。
+- ✅ ONNX ロード失敗は **GUI へ専用エラー通知**（R-OTC-23、camera R-CAM-14 / gui R-GUI-44 と同一機構・ステータス Queue 推奨、最終形は実装時確定）。
 - ✅ 当面 **YOLOX 固定**で進める（他モデル対応は将来）。
 - 🔁 **他 spec 確定の反映**: `0.1`/`0.45` は config-manager で `detection_threshold`/`nms_iou_threshold` にキー化決定済み。本モジュールで消費差し替え。
 - 🔎 `_read_frame` は `read`(2-tuple)/`read_latest`(3-tuple) を `(frame_ref, image, skipped)` に正規化（`fifo` は skip=0）。

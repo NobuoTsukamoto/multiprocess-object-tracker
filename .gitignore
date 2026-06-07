@@ -148,3 +148,6 @@ cython_debug/
 uv.lock
 .vscode
 models/*
+
+# Claude Code 作業用ワークツリー（コミット対象外）
+.claude/worktrees/

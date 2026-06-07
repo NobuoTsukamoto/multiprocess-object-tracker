@@ -66,11 +66,11 @@
   - それ以外の文字列 → パス/URL（動画ファイル、RTSP 等）としてそのまま渡す
   - 既定値 `0`（後方互換）。相対パスは OpenCV 既定（作業ディレクトリ基準）。
   - 補足: GStreamer パイプライン文字列は第2引数 `cv2.CAP_GSTREAMER` が要るため今回は対象外（将来 `camera.api_preference` を検討）。
-- ✅ **オープン失敗時は GUI へ通知**: 現状は error ログ後に `return`（プロセス終了、`camera_controller.py:44-48`）。これに加え、GUI へオープン失敗を通知する信号を送る（プロセスの自然死とエラー終了を区別する）。通知機構（専用 `Event` or ステータス Queue）は設計で確定。新設要求 **R-CAM-14**。
+- ✅ **オープン失敗時は GUI へ通知（機構確定）**: 現状は error ログ後に `return`（プロセス終了、`camera_controller.py:44-48`）。これに加え、GUI へオープン失敗を**専用エラーとして通知**する（プロセスの自然死とエラー終了を区別する）。GUI 側はこれを受けて専用エラー状態を表示する（[`gui-controller`](../gui-controller/) R-GUI-44 で確定）。通知機構はエラー内容（どのワーカー・失敗理由）を運べる**ステータス Queue を推奨**（tracking R-OTC-23 と共通、最終確定は実装時）。新設要求 **R-CAM-14**。
 - ✅ **grab 連続失敗は無限リトライのまま（仕様）**: `ret=False` の間、`stop_event` まで 0.1 秒間隔で再試行する現状挙動を正式仕様とする（上限/バックオフは入れない）。R-CAM-07 を正式仕様として確定。
 - ✅ **チャンネル数不一致はエラー扱いでドロップ**: `cv2.resize` は高さ・幅のみ補正するため、チャンネル数が期待と異なるフレームは shape 不一致のまま。これを**明示的に検出して error ログを出し、当該フレームをドロップ（書き込みスキップ）して継続**する。新設要求 **R-CAM-15**。
 - ✅ **コメント修正**: 「Resize/pad」コメント（`camera_controller.py:62`）を実装（resize のみ）に合わせて修正する（tasks 文書化）。
 
 ## 未確定 / 要レビュー事項
 
-- [ ] **GUI 通知機構の選択**: オープン失敗通知を専用 `multiprocessing.Event`（例: `camera_error_event`）で行うか、ステータス用 Queue でエラー内容を送るか（gui-controller spec と整合させる）。
+- （解消済み）GUI 通知機構の選択 → [`gui-controller`](../gui-controller/) R-GUI-44 で方針確定（専用エラー通知＋GUI 表示、**ステータス Queue 推奨**、camera/tracking 共通）。最終的な実装形（Event か Queue か）は実装時に 3 モジュール横断で確定する。

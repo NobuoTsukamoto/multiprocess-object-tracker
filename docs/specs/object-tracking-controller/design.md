@@ -69,7 +69,7 @@ flowchart TD
 
 ## エッジケース / 異常系
 
-- **ONNX ロード失敗**: error ログ→`return`（プロセス終了）。**改修予定**: GUI へ通知（R-OTC-23、camera R-CAM-14 と同一機構）。出典 `:119-121`。
+- **ONNX ロード失敗**: error ログ→`return`（プロセス終了）。**改修予定・機構確定**: GUI へ**専用エラー通知**（R-OTC-23、camera R-CAM-14 / [`gui-controller`](../gui-controller/) R-GUI-44 と同一機構・ステータス Queue 推奨、最終形は実装時確定）。出典 `:119-121`。
 - **読み出しタイムアウト**: `Empty`→continue（フレーム未着でも CPU を無駄に回さない）。出典 `:143-144`。
 - **未知ポリシー**: warning＋`bounded_latest` フォールバック。出典 `:61-66`。
 - **空検出 / tracker_id None**: `track_infos` 空のまま `TrackingResult` を送出。出典 `:199-207`。
