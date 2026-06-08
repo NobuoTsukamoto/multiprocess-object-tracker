@@ -47,6 +47,21 @@ class CameraController(multiprocessing.Process):
             if self.logger is not None:
                 self.logger.error("Failed to report camera error to GUI.")
 
+    @staticmethod
+    def _fit_to_pool(frame, expected_shape):
+        """Fit a frame to the pool's expected shape.
+
+        Resizes height/width when they differ. cv2.resize cannot change the
+        channel count, so if the shape still differs (e.g. a grayscale or
+        4-channel frame) the frame cannot fit the SHM slot; None is returned
+        so the caller drops it instead of silently failing the write.
+        """
+        if frame.shape != expected_shape:
+            frame = cv2.resize(frame, (expected_shape[1], expected_shape[0]))
+        if frame.shape != expected_shape:
+            return None
+        return frame
+
     def run(self):
         self.logger = Logger(self.logging_config).get_logger()
         self.logger.info("CameraController process started.")
@@ -75,14 +90,20 @@ class CameraController(multiprocessing.Process):
                     time.sleep(0.1)
                     continue
 
-                # Resize/pad if camera returned an unexpected shape so it
-                # fits the SHM slot. Most cameras honor the requested
-                # resolution; this is a safety net.
+                # Fit the frame to the SHM slot shape. cv2.resize corrects
+                # only height/width; a channel-count mismatch cannot be fixed,
+                # so such frames are dropped explicitly here rather than
+                # silently failing the write below. Most cameras honor the
+                # requested resolution; this is a safety net.
                 expected_shape = tracking_pool.shape
-                if frame.shape != expected_shape:
-                    frame = cv2.resize(
-                        frame, (expected_shape[1], expected_shape[0])
+                fitted = self._fit_to_pool(frame, expected_shape)
+                if fitted is None:
+                    self.logger.error(
+                        f"Frame shape {frame.shape} cannot fit pool shape "
+                        f"{expected_shape} (channel mismatch); dropping frame."
                     )
+                    continue
+                frame = fitted
 
                 timestamp = time.time()
 

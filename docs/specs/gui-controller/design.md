@@ -144,5 +144,5 @@ flowchart LR
 - `src/camera_controller.py` — 生成するワーカー（[`camera-controller`](../camera-controller/)）
 - `src/object_tracking_controller.py` — 生成するワーカー（[`object-tracking-controller`](../object-tracking-controller/)）
 - `src/data_models.py:35-67` — `TrackInfo`/`TrackingResult`/`WorkerError`（[`data-models`](../data-models/)）
-- `src/camera_controller.py:38-48,61` / `src/object_tracking_controller.py:46-56,135` — `_report_error`（ワーカー側送出）
+- `src/camera_controller.py:38-48,76` / `src/object_tracking_controller.py:46-56,135` — `_report_error`（ワーカー側送出）
 - `src/config_manager.py:40-49` — `GuiConfig`、`:12-17` — `CameraConfig`（[`config-manager`](../config-manager/)）
