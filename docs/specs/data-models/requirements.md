@@ -44,12 +44,12 @@
 ## 前提条件 / 不変条件
 
 - **生成側の責務**: `TrackInfo` は `tracker_id is not None` の検出に対してのみ生成され、`box` は numpy 配列を `tolist()` で `list[float]` に、`track_id`/`class_id` は `int()`、`score` は `float()` にキャストして詰める。出典 `src/object_tracking_controller.py:214-222`。
-- **`frame_id` による突き合わせ**: `TrackingResult.frame_id` は元フレーム（`FrameRef.frame_id`）と一致し、GUI 側はこの ID でカメラ画像と追跡結果を突き合わせる。出典 `src/object_tracking_controller.py:228-231`、`src/gui_controller.py:599-607`。
+- **`frame_id` による突き合わせ**: `TrackingResult.frame_id` は元フレーム（`FrameRef.frame_id`）と一致し、GUI 側はこの ID でカメラ画像と追跡結果を突き合わせる。出典 `src/object_tracking_controller.py:228-231`、`src/gui_controller.py:603-611`。
 - **`timestamp` の意味**: `FrameRef.timestamp` / `TrackingResult.timestamp` は撮像時刻で、レイテンシ算出（`(now - timestamp)*1000`）の基準になる。出典 `src/object_tracking_controller.py:226`、`src/gui_controller.py:546,549`。
 - **後方互換アクセス**: 消費側は `queue_latency_ms` / `total_latency_ms` を `getattr(latest, "...", 0.0)` で読み、旧 `TrackingResult` でも欠落を許容する。一方 `process_time_ms` は直接アクセス（`getattr` なし）で、これが当初からの必須フィールドであることを裏付ける。出典 `src/gui_controller.py:566`（直接）, `:567-572`（getattr）。
-- **`detections` の所有**: `TrackingResult.detections` には推論+NMS+追跡を経た `tracked_detections`（`sv.Detections`）が入り、GUI のオーバーレイ描画に使われる。出典 `src/object_tracking_controller.py:232`、`src/gui_controller.py:607`。
+- **`detections` の所有**: `TrackingResult.detections` には推論+NMS+追跡を経た `tracked_detections`（`sv.Detections`）が入り、GUI のオーバーレイ描画に使われる。出典 `src/object_tracking_controller.py:232`、`src/gui_controller.py:611`。
 - **レイテンシ恒等式（R-DM-11）**: 3値は同一の `start_time`/`end_time`/`frame_ref.timestamp` から算出されるため、`total_latency_ms == queue_latency_ms + process_time_ms` が（浮動小数の誤差を除き）厳密に成立する。出典 `src/object_tracking_controller.py:163-165,224-226`。
-- **`track_infos` と `detections` の重複**: 同一の追跡結果が `track_infos`（`List[TrackInfo]`）と `detections`（`sv.Detections`）に二重に格納される。GUI は `track_infos` から `track_id`/`class_id` のみ（リスト表示用）、ボックス描画は `detections` から行う。出典 `src/gui_controller.py:577-583,652`。
+- **`track_infos` と `detections` の重複**: 同一の追跡結果が `track_infos`（`List[TrackInfo]`）と `detections`（`sv.Detections`）に二重に格納される。GUI は `track_infos` から `track_id`/`class_id` のみ（リスト表示用）、ボックス描画は `detections` から行う。出典 `src/gui_controller.py:585-588,660`。
 
 ## 確定事項（レビュー反映済み）
 

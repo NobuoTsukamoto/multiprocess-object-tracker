@@ -74,45 +74,46 @@
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-GUI-25 | 状態駆動 | `stop_event` がセットされていない間、システムは GUI ループを `after(5ms)` で繰り返すこと（セット時は再スケジュールしない）。 | `src/gui_controller.py:720-753` | — |
+| R-GUI-25 | 状態駆動 | `stop_event` がセットされていない間、システムは GUI ループを `after(5ms)` で繰り返すこと（セット時は再スケジュールしない）。 | `src/gui_controller.py:730-763` | — |
 | R-GUI-26 | イベント駆動 | GUI ループ各反復で、システムは GUI 用プールから読める全フレームを `read_nowait` で取り出し、`frame_id` をキーに画像と timestamp をバッファし、上限超過分は最古から破棄すること。 | `src/gui_controller.py:530-553` | — |
 | R-GUI-27 | イベント駆動 | 開始後に最初の GUI フレームを受信したとき、システムは frame_id・経過時間・カメラレイテンシを一度だけ info ログすること。 | `src/gui_controller.py:540-547` | — |
-| R-GUI-28 | イベント駆動 | GUI ループ各反復で、システムは `track_queue` を drain して最新の `TrackingResult` のみ保持し、`process_time_ms`/`queue_latency_ms`/`total_latency_ms` を更新し、追跡物体リスト（先頭10件＋超過時 "..."）を更新すること。 | `src/gui_controller.py:555-584` | — |
-| R-GUI-29 | イベント駆動 | 表示フレーム選択時、最新追跡結果の `frame_id` がバッファに在れば、システムはそれより古いフレームを破棄したうえで当該フレームと検出（オーバーレイ）を返すこと。 | `src/gui_controller.py:599-607` | `tests/test_gui_controller.py::GUIControllerTest::test_select_display_frame_prefers_matching_tracking_frame` |
-| R-GUI-30 | 異常系 | 最新追跡結果の `frame_id` がバッファ最古より古い（対応フレーム破棄済み）とき、システムはオーバーレイミスを同一 frame_id につき一度だけ warning ログすること。 | `src/gui_controller.py:608,615-638` | `tests/test_gui_controller.py::GUIControllerTest::test_select_display_frame_logs_stale_overlay_miss_once` |
-| R-GUI-31 | イベント駆動 | 追跡結果が無い／一致フレームが未着（未来の frame_id）／バッファに一致が無いとき、システムは最新フレームをオーバーレイ無しで表示し、ミスログを出さないこと。 | `src/gui_controller.py:599-613,621-622` | `tests/test_gui_controller.py::GUIControllerTest::test_select_display_frame_does_not_log_when_track_frame_is_pending` |
-| R-GUI-32 | 異常系 | フレームバッファが空のとき、システムは表示対象を持たず（`None`）描画をスキップすること。 | `src/gui_controller.py:594-596,730` | — |
-| R-GUI-33 | イベント駆動 | 表示フレームか追跡結果が前回と変化した（render_key 不一致）ときのみ、システムは画像を再描画し、表示レート/表示レイテンシを更新し、表示キャッシュを更新すること。 | `src/gui_controller.py:730-748` | — |
-| R-GUI-34 | イベント駆動 | 検出があるフレームを描画するとき、システムは `BoxAnnotator`＋`LabelAnnotator`（ラベルは `ID:<tracker_id> <class_name> (<conf>)`）でオーバーレイを描き、BGR→RGB 変換のうえ表示領域に収まるよう縦横比維持で LANCZOS 縮小すること。 | `src/gui_controller.py:640-679` | — |
-| R-GUI-35 | 状態駆動 | 非アクティブ表示（停止中など）の間、システムは直近表示画像をグレースケール化＋減光（明度 0.45）して状態文字とともに表示すること。 | `src/gui_controller.py:660-662,681-689` | — |
+| R-GUI-28 | イベント駆動 | GUI ループ各反復で、システムは `track_queue` を drain して最新の `TrackingResult` のみ保持し、`process_time_ms`/`queue_latency_ms`/`total_latency_ms` を更新し、追跡物体リスト（先頭10件＋超過時 "..."）を更新すること。 | `src/gui_controller.py:555-588` | — |
+| R-GUI-29 | イベント駆動 | 表示フレーム選択時、最新追跡結果の `frame_id` がバッファに在れば、システムはそれより古いフレームを破棄したうえで当該フレームと検出（オーバーレイ）を返すこと。 | `src/gui_controller.py:603-611` | `tests/test_gui_controller.py::GUIControllerTest::test_select_display_frame_prefers_matching_tracking_frame` |
+| R-GUI-30 | 異常系 | 最新追跡結果の `frame_id` がバッファ最古より古い（対応フレーム破棄済み）とき、システムはオーバーレイミスを同一 frame_id につき一度だけ warning ログすること。 | `src/gui_controller.py:612,619-642` | `tests/test_gui_controller.py::GUIControllerTest::test_select_display_frame_logs_stale_overlay_miss_once` |
+| R-GUI-31 | イベント駆動 | 追跡結果が無い／一致フレームが未着（未来の frame_id）／バッファに一致が無いとき、システムは最新フレームをオーバーレイ無しで表示し、ミスログを出さないこと。 | `src/gui_controller.py:603-617,625-626` | `tests/test_gui_controller.py::GUIControllerTest::test_select_display_frame_does_not_log_when_track_frame_is_pending` |
+| R-GUI-32 | 異常系 | フレームバッファが空のとき、システムは表示対象を持たず（`None`）描画をスキップすること。 | `src/gui_controller.py:598-600,740` | — |
+| R-GUI-33 | イベント駆動 | 表示フレームか追跡結果が前回と変化した（render_key 不一致）ときのみ、システムは画像を再描画し、表示レート/表示レイテンシを更新し、表示キャッシュを更新すること。 | `src/gui_controller.py:740-758` | — |
+| R-GUI-34 | イベント駆動 | 検出があるフレームを描画するとき、システムは `BoxAnnotator`＋`LabelAnnotator`（ラベルは `ID:<tracker_id> <class_name> (<conf>)`）でオーバーレイを描き、BGR→RGB 変換のうえ表示領域に収まるよう縦横比維持で LANCZOS 縮小すること。 | `src/gui_controller.py:644-689` | — |
+| R-GUI-35 | 状態駆動 | 非アクティブ表示（停止中など）の間、システムは直近表示画像をグレースケール化＋減光（明度 0.45）して状態文字とともに表示すること。 | `src/gui_controller.py:670-672,691-699` | — |
 | R-GUI-36 | ユビキタス | システムは状態文字に応じた背景色（`STATUS_COLORS`、未知は「待機中」色）を状態ラベルに適用し、実行中は中央オーバーレイを隠し、非実行中は中央オーバーレイを表示すること。 | `src/gui_controller.py:31-38,333-340` | — |
-| R-GUI-37 | ユビキタス | システムは camera/detection/display の FPS をサンプル間経過時間から算出（2点未満は 0.0）し、各レイテンシ（待ち/処理/合計）を性能テーブルに表示すること。 | `src/gui_controller.py:139-144,691-718` | `tests/test_gui_controller.py::GUIControllerTest::test_calculate_rate_uses_elapsed_between_samples` |
+| R-GUI-37 | ユビキタス | システムは camera/detection/display の FPS をサンプル間経過時間から算出（2点未満は 0.0）し、各レイテンシ（待ち/処理/合計）を性能テーブルに表示すること。 | `src/gui_controller.py:139-144,701-728` | `tests/test_gui_controller.py::GUIControllerTest::test_calculate_rate_uses_elapsed_between_samples` |
 
 ### 終了（on_closing）
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-GUI-38 | イベント駆動 | ウィンドウクローズ（`WM_DELETE_WINDOW`/`Escape`/`Alt-F4`/「終了」）時、ワーカーが生存していればシステムはまず `stop_tracking` を実行すること。 | `src/gui_controller.py:137,270-276,755-757` | — |
-| R-GUI-39 | イベント駆動 | クローズ時、システムは GUI 用プールの読み出しハンドルを `close()` すること（例外は握りつぶす）。 | `src/gui_controller.py:758-762` | — |
-| R-GUI-40 | 異常系 | クローズ時にワーカーがまだ生存しているとき、システムは共有メモリ解放をスキップし error ログすること（二重所有/破損回避）。 | `src/gui_controller.py:764-768` | — |
-| R-GUI-41 | イベント駆動 | クローズ時にワーカーが全停止しているとき、システムは両プールを `mark_inactive()`＋`cleanup()` し、ルートウィンドウを破棄すること。 | `src/gui_controller.py:769-774` | — |
+| R-GUI-38 | イベント駆動 | ウィンドウクローズ（`WM_DELETE_WINDOW`/`Escape`/`Alt-F4`/「終了」）時、ワーカーが生存していればシステムはまず `stop_tracking` を実行すること。 | `src/gui_controller.py:137,270-276,765-767` | — |
+| R-GUI-39 | イベント駆動 | クローズ時、システムは GUI 用プールの読み出しハンドルを `close()` すること（例外は握りつぶす）。 | `src/gui_controller.py:768-772` | — |
+| R-GUI-40 | 異常系 | クローズ時にワーカーがまだ生存しているとき、システムは共有メモリ解放をスキップし error ログすること（二重所有/破損回避）。 | `src/gui_controller.py:774-778` | — |
+| R-GUI-41 | イベント駆動 | クローズ時にワーカーが全停止しているとき、システムは両プールを `mark_inactive()`＋`cleanup()` し、ルートウィンドウを破棄すること。 | `src/gui_controller.py:779-784` | — |
 | R-GUI-42 | ユビキタス | `_workers_alive` は camera/tracking のいずれかが生存していれば真を返すこと。 | `src/gui_controller.py:484-488` | `tests/test_gui_controller.py::GUIControllerTest::test_workers_alive_checks_camera_and_tracking_processes` |
-| R-GUI-43 | イベント駆動 | `run()` が呼ばれたとき、システムは tkinter のメインループを開始すること。 | `src/gui_controller.py:776-777` | — |
+| R-GUI-43 | イベント駆動 | `run()` が呼ばれたとき、システムは tkinter のメインループを開始すること。 | `src/gui_controller.py:786-787` | — |
 
 ### ワーカーエラー通知（実装済み）
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-GUI-44 | 異常系 | ワーカーがカメラオープン失敗（camera R-CAM-14）／ONNX ロード失敗（tracking R-OTC-23）を `WorkerError` として `error_queue` に通知したとき、システムは `stop_event` をセットして両ワーカーを停止し、状態「エラー」（専用の状態色＋エラー文）を表示し、開始ボタンを再有効化（再試行可）すること。これによりプロセスの自然死（stop_event 起因）とエラー終了を区別する。 | `src/gui_controller.py:503-528,720-724` | — |
+| R-GUI-44 | 異常系 | ワーカーがカメラオープン失敗（camera R-CAM-14）／ONNX ロード失敗（tracking R-OTC-23）を `WorkerError` として `error_queue` に通知したとき、システムは `stop_event` をセットして両ワーカーを停止し、状態「エラー」（専用の状態色＋エラー文）を表示し、開始ボタンを再有効化（再試行可）すること。これによりプロセスの自然死（stop_event 起因）とエラー終了を区別する。 | `src/gui_controller.py:503-528,730-734` | — |
 | R-GUI-46 | イベント駆動 | 生成されたとき、システムはワーカーエラー用の `error_queue`（無制限 `multiprocessing.Queue`）を owner として作成し、開始時に両ワーカーへ渡すこと。 | `src/gui_controller.py:80-82,377-401` | — |
-| R-GUI-47 | イベント駆動 | GUI ループ各反復の冒頭で、システムは `error_queue` を確認し、エラーがあれば最初の1件（=根本原因）を取り出して残りを drain し、エラー処理へ遷移すること。 | `src/gui_controller.py:490-501,720-724` | `tests/test_gui_controller.py::GUIControllerTest::test_drain_worker_errors_returns_first_and_drains_rest`, `::test_drain_worker_errors_returns_none_when_empty` |
+| R-GUI-47 | イベント駆動 | GUI ループ各反復の冒頭で、システムは `error_queue` を確認し、エラーがあれば最初の1件（=根本原因）を取り出して残りを drain し、エラー処理へ遷移すること。 | `src/gui_controller.py:490-501,730-734` | `tests/test_gui_controller.py::GUIControllerTest::test_drain_worker_errors_returns_first_and_drains_rest`, `::test_drain_worker_errors_returns_none_when_empty` |
 | R-GUI-48 | イベント駆動 | 「開始」時、システムは `error_queue` を drain し直前のエラー状態（`_worker_error`）をリセットすること。 | `src/gui_controller.py:363-364` | — |
 
-### 改修予定
+### class_id 範囲外ガード（実装済み）
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-GUI-45 | 異常系 | 描画／追跡リスト更新で `class_names[class_id]` が範囲外（設定不整合）のとき、システムは当該ラベル/項目を**無視して何もしない**こと（例外で表示を止めない）（**改修予定・方針確定**。現状はガード無しで `IndexError` になりうる）。 | `src/gui_controller.py:575-584,640-655` | — |
+| R-GUI-45 | 異常系 | 描画／追跡リスト更新で `class_id` が `detection.class_names` の範囲外（設定不整合）のとき、システムは例外で表示を止めず、追跡リストでは当該項目を無視（スキップ）し、オーバーレイではクラス名を省いて `ID:<tracker_id> (<conf>)` のみ表示すること。 | `src/gui_controller.py:577-588,647-665` | — |
+| R-GUI-49 | ユビキタス | システムは `class_id` が `0 <= class_id < len(class_names)` のときのみクラス名を返し、範囲外では `None` を返す共通ヘルパ（`_safe_class_name`）を提供すること。 | `src/gui_controller.py:789-800` | `tests/test_gui_controller.py::GUIControllerTest::test_safe_class_name_returns_name_in_range`, `::test_safe_class_name_returns_none_out_of_range` |
 
 ## 前提条件 / 不変条件
 
@@ -121,18 +122,18 @@
 - **`mark_active`/`mark_inactive` の対称性**: プロセス起動前に `mark_active`、停止確定後に `mark_inactive`。起動失敗時・エラー時も `mark_inactive` で巻き戻す。出典 `src/gui_controller.py:403-416,435-436,515-517`。
 - **両プール同一 shape**: 追跡用/GUI 用とも `frame_shape=(camera.height, camera.width, 3)`。CameraController が同一フレームを両プールへ書く前提と整合。出典 `src/gui_controller.py:68,84-95`、[`camera-controller`](../camera-controller/)。
 - **`n_slots = max_queue_length + 2`**: consumer が常に在庫スロットを1つ確保できるよう余裕を持たせる。出典 `src/gui_controller.py:66-69`。
-- **`frame_id` 突合**: GUI は `TrackingResult.frame_id` でカメラ画像（フレームバッファ）と追跡結果を結合する。出典 `src/gui_controller.py:599-607`、[`data-models`](../data-models/)。
-- **フレームバッファは frame_id 昇順**: `OrderedDict` に到着順（=`frame_id` 昇順）で挿入される前提で「最古=先頭」「最新=末尾」を使う。出典 `src/gui_controller.py:551-553,603,611`。
-- **GUI ループ単一スレッド**: エラー確認・drain・選択・描画・再スケジュールは tkinter メインスレッドの `after` 連鎖で逐次実行される。出典 `src/gui_controller.py:720-753`。
+- **`frame_id` 突合**: GUI は `TrackingResult.frame_id` でカメラ画像（フレームバッファ）と追跡結果を結合する。出典 `src/gui_controller.py:603-611`、[`data-models`](../data-models/)。
+- **フレームバッファは frame_id 昇順**: `OrderedDict` に到着順（=`frame_id` 昇順）で挿入される前提で「最古=先頭」「最新=末尾」を使う。出典 `src/gui_controller.py:551-553,607,615`。
+- **GUI ループ単一スレッド**: エラー確認・drain・選択・描画・再スケジュールは tkinter メインスレッドの `after` 連鎖で逐次実行される。出典 `src/gui_controller.py:730-763`。
 - **エラー通知は GUI が停止判断**: ワーカーは `WorkerError` を `error_queue` に置くだけで自プロセスを `return` する。全停止・状態遷移・再試行可否の判断は GUI（`_handle_worker_error`）が一手に行う。出典 `src/gui_controller.py:503-528`。
 
 ## 確定事項（レビュー反映済み）
 
 - ✅ **ワーカーエラーは専用エラーとして GUI に表示（R-GUI-44、実装済み）**: カメラオープン失敗（camera R-CAM-14）・ONNX ロード失敗（tracking R-OTC-23）を `data_models.WorkerError` として専用 `error_queue` で GUI に伝え、状態「エラー」（専用色＋エラー文）で表示する。**機構はステータス Queue に確定**（`multiprocessing.Queue`、無制限）。エラー時は `stop_event` で全停止し、開始ボタンを再有効化して再試行可能にする。出典 `src/gui_controller.py:80-82,490-528,720-724`、`src/data_models.py:56-67`。
-- ✅ **「停止失敗」後はアプリ再起動を要する（最低限実装で許容）**: `stop_tracking` は `stop_event.set()` 済みのため停止失敗時に `_update_gui` が再スケジュールされず表示が固まる（`:752-753`）。これは許容とし、リカバリ導線は設けず**アプリ再起動で復帰**する前提とする（最低限の実装）。
-- ✅ **`class_names[class_id]` 範囲外は無視（R-GUI-45）**: 設定不整合で添字が範囲外のとき、当該ラベル/項目をスキップし表示を継続する（例外で止めない）。出典 `:575-584,640-655`。
+- ✅ **「停止失敗」後はアプリ再起動を要する（最低限実装で許容）**: `stop_tracking` は `stop_event.set()` 済みのため停止失敗時に `_update_gui` が再スケジュールされず表示が固まる（`:762-763`）。これは許容とし、リカバリ導線は設けず**アプリ再起動で復帰**する前提とする（最低限の実装）。
+- ✅ **`class_id` 範囲外は無視（R-GUI-45、実装済み）**: 共通ヘルパ `_safe_class_name`（R-GUI-49）で範囲チェックし、追跡リストは当該項目をスキップ、オーバーレイはクラス名を省いて `ID:<tracker_id> (<conf>)` のみ表示する（例外で止めない）。出典 `:577-588,647-665,789-800`。
 
 ## 未確定 / 要レビュー事項
 
 - [ ] **`start_tracking` 中の例外通知**: 起動例外は再送出される（`:416`）が、`main.py` は捕捉して終了する（`src/main.py:41-43`）。GUI 上のユーザー通知（ダイアログ等）が無くて良いか確認（R-GUI-44 の専用エラー表示に寄せるかも含めて検討）。
-- [ ] **`_drain_track_results` の Listbox 更新コスト**: 反復ごとに `track_list.delete(0, END)`＋再挿入（`:575-584`）。多数追跡時の再描画コストは許容範囲か確認（将来改善）。
+- [ ] **`_drain_track_results` の Listbox 更新コスト**: 反復ごとに `track_list.delete(0, END)`＋再挿入（`:577-588`）。多数追跡時の再描画コストは許容範囲か確認（将来改善）。

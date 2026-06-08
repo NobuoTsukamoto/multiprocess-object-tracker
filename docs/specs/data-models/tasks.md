@@ -38,7 +38,7 @@
 > 「`Any` のまま、supervision バージョンアップ時に直してテストパスで OK」という方針が機能する前提。
 > 下記が無いと描画が壊れても CI がグリーンのまま通る（requirements「確定事項」参照）。
 - [ ] **pickle 往復テスト**: 実 `sv.Detections` を `detections` に入れた `TrackingResult` を pickle→unpickle し、`len()`/`.confidence`/`.class_id`/`.tracker_id` が復元されることを検証（R-DM-08/09）。
-- [ ] **GUI 描画スモークテスト**: 実 `sv.Detections` を `_render_image`（`src/gui_controller.py:640-655`）経路に通し、`.confidence`/`.class_id`/`.tracker_id` 参照と annotator 再投入が成立することを確認。
+- [ ] **GUI 描画スモークテスト**: 実 `sv.Detections` を `_render_image`（`src/gui_controller.py:644-689`）経路に通し、`.confidence`/`.class_id`/`.tracker_id` 参照と annotator 再投入が成立することを確認。
 
 ### 実装 / 改善（将来）
 - [ ] `TrackingResult.detections` の `Any` を見直し（`TYPE_CHECKING` 下での `sv.Detections` 注釈導入）。型安全性と循環依存回避のバランスを検討。

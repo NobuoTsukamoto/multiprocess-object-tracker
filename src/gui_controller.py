@@ -578,9 +578,13 @@ class GUIController:
                 if i >= 10:
                     self.track_list.insert(tk.END, "...")
                     break
+                class_name = self._safe_class_name(class_names, track.class_id)
+                if class_name is None:
+                    # 設定不整合（class_id が範囲外）: 当該項目を無視する。
+                    continue
                 self.track_list.insert(
                     tk.END,
-                    f"ID: {track.track_id} / クラス: {class_names[track.class_id]}",
+                    f"ID: {track.track_id} / クラス: {class_name}",
                 )
 
     def _select_display_frame(self):
@@ -641,14 +645,20 @@ class GUIController:
         img = image
         if detections is not None and len(detections) > 0:
             class_names = self.config_manager.get_config("detection").class_names
-            labels = [
-                f"ID:{tracker_id} {class_names[class_id]} ({confidence:.2f})"
-                for confidence, class_id, tracker_id in zip(
-                    detections.confidence,
-                    detections.class_id,
-                    detections.tracker_id,
-                )
-            ]
+            labels = []
+            for confidence, class_id, tracker_id in zip(
+                detections.confidence,
+                detections.class_id,
+                detections.tracker_id,
+            ):
+                class_name = self._safe_class_name(class_names, class_id)
+                if class_name is None:
+                    # 設定不整合（class_id が範囲外）: クラス名を無視し ID のみ表示。
+                    labels.append(f"ID:{tracker_id} ({confidence:.2f})")
+                else:
+                    labels.append(
+                        f"ID:{tracker_id} {class_name} ({confidence:.2f})"
+                    )
             img = self.box_annotator.annotate(scene=img.copy(), detections=detections)
             img = self.label_annotator.annotate(
                 scene=img, detections=detections, labels=labels
@@ -775,3 +785,14 @@ class GUIController:
 
     def run(self):
         self.root.mainloop()
+
+    @staticmethod
+    def _safe_class_name(class_names, class_id):
+        """Return the class name for class_id, or None if out of range.
+
+        Guards against a config/model mismatch (class_id not present in
+        detection.class_names) so a bad index never aborts the GUI loop.
+        """
+        if 0 <= class_id < len(class_names):
+            return class_names[class_id]
+        return None

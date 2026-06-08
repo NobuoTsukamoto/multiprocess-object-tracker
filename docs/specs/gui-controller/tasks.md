@@ -25,7 +25,8 @@
 | R-GUI-46（error_queue 生成/受け渡し） | — | ⬜ 未カバー（実装済み） |
 | R-GUI-47（error_queue drain） | `test_drain_worker_errors_returns_first_and_drains_rest` / `..._returns_none_when_empty` | ✅ カバー済み |
 | R-GUI-48（開始時のエラーリセット） | — | ⬜ 未カバー（実装済み） |
-| R-GUI-45（class_id 範囲外は無視） | — | ⬜ 未カバー（改修予定・方針確定） |
+| R-GUI-45（class_id 範囲外は無視） | （描画/リスト経路の直接テストは未） | ⬜ 部分（実装済み） |
+| R-GUI-49（`_safe_class_name` 範囲チェック） | `test_safe_class_name_returns_name_in_range` / `..._returns_none_out_of_range` | ✅ カバー済み |
 
 ## タスク
 
@@ -45,12 +46,11 @@
 - [x] **ワーカーエラー通知の受信＋GUI 表示**（R-GUI-44, R-GUI-46〜48）: `data_models.WorkerError` を専用 `error_queue`（無制限 `multiprocessing.Queue`）で受け、`_handle_worker_error` で全停止→状態「エラー」（専用色＋メッセージ）→開始再有効化。camera R-CAM-14 / tracking R-OTC-23 と共通機構。**機構はステータス Queue に確定**。
 - [x] `error_queue` 受信で「ワーカーの自然死/エラー死」を区別（自然死=stop_event 起因、エラー死=WorkerError 受信）。
 - [ ] **`_handle_worker_error` の直接テスト**（R-GUI-44）: プロセス/プール stub で「stop_event セット・mark_inactive・状態エラー・開始再有効化」を検証（現状は drain 部のみカバー）。
-
-### 実装（✅方針確定・未着手）
-- [ ] **`class_id` 範囲外は無視**（R-GUI-45）: `_drain_track_results`（`:526-535`）と `_render_image`（`:591-606`）の `class_names[class_id]` を範囲チェックし、範囲外の項目はスキップして表示継続（例外で止めない）。
+- [x] **`class_id` 範囲外は無視**（R-GUI-45, R-GUI-49、**完了**）: 共通ヘルパ `_safe_class_name`（`:789-800`）で範囲チェックし、`_drain_track_results`（`:577-588`）は当該項目をスキップ、`_render_image`（`:647-665`）はクラス名を省いて `ID:<tracker_id> (<conf>)` のみ表示。`_safe_class_name` の単体テスト2本を追加。
+- [ ] **描画/リスト経路の直接テスト**（R-GUI-45）: 範囲外 `class_id` を含む追跡結果で Listbox スキップ・ラベル省略を検証（GUI スタブ要）。
 
 ### 実装 / 改善（将来）
-- [ ] **「停止失敗」後はアプリ再起動を前提**（R-GUI-22、確定）: 停止失敗時に `_update_gui` が止まる（`stop_event` set 済み）が、リカバリ導線は設けず**最低限の実装**とする。状態「停止失敗」表示と再起動案内（ログ/UI 文言）に留める。出典 `src/gui_controller.py:435-445,698-699`。
+- [ ] **「停止失敗」後はアプリ再起動を前提**（R-GUI-22、確定）: 停止失敗時に `_update_gui` が止まる（`stop_event` set 済み）が、リカバリ導線は設けず**最低限の実装**とする。状態「停止失敗」表示と再起動案内（ログ/UI 文言）に留める。出典 `src/gui_controller.py:444-454,762-763`。
 - [ ] **`start_tracking` 例外のユーザー通知**: 起動失敗を GUI 上で可視化するか検討（現状は再 raise → `main.py` で stderr 出力＋終了）。R-GUI-44 の専用エラー表示に寄せる案も含める。
 - [ ] **`_drain_track_results` の Listbox 全消去＋再挿入の最適化**: 多数追跡時の再描画コスト削減（差分更新等）。
 - [ ] 型注釈の補強（`_select_display_frame`/`_render_image` の戻り値・引数型、`_frame_buffer: OrderedDict[int, np.ndarray]` 等）。
@@ -59,7 +59,7 @@
 
 - ✅ ワーカーエラー通知（R-GUI-44）は **実装済み**。`data_models.WorkerError` を専用 `error_queue`（`multiprocessing.Queue`、無制限）で受け、全停止＋状態「エラー」表示＋開始再有効化。camera R-CAM-14 / tracking R-OTC-23 と共通機構（**ステータス Queue に確定**）。
 - ✅ 「停止失敗」後はアプリ再起動で復帰（R-GUI-22、最低限実装で許容）。
-- ✅ `class_id` 範囲外（`class_names` 添字外）は**無視**して表示継続（R-GUI-45）。
+- ✅ `class_id` 範囲外（`class_names` 添字外）は**無視**して表示継続（R-GUI-45、**実装済み**）。共通ヘルパ `_safe_class_name`（R-GUI-49）でガード。リストはスキップ、オーバーレイは ID のみ表示。
 - 🔎 `frame_read_policy`/`max_frame_skip` は **GUI 表示側に作用しない**（コード確認済み）。GUI は全カメラフレームをバッファ＋最新追跡結果で同期表示。ポリシーは tracking ワーカー入力読み出し専用。
 - 🔎 **同期表示の核心**: 最新カメラフレームではなく「追跡結果の `frame_id` に一致するフレーム」へオーバーレイを描く。一致が破棄済みなら最新フレームをオーバーレイ無しで表示し、オーバーレイミスを一度だけ警告。
 - 🔎 **render_key 差分描画**: `(表示 frame_id, オーバーレイ frame_id)` が不変なら再描画しない。

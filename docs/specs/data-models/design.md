@@ -56,12 +56,12 @@ flowchart LR
     Pool -->|FrameRef + 画像コピー| OT[ObjectTrackingController]
     OT -->|TrackInfo を構築 :201-207| TR[TrackingResult :213-221]
     TR -->|track_queue.put| GUI[GUIController]
-    GUI -->|frame_id で突合 :599-607| Render[オーバーレイ描画]
+    GUI -->|frame_id で突合 :603-611| Render[オーバーレイ描画]
 ```
 
 - **生成**: `ObjectTrackingController` が推論→NMS→`sv.ByteTrack` 後、追跡ごとに `TrackInfo` を作り、`TrackingResult` にまとめて `track_queue` へ put（満杯時は最古を捨てる）。出典 `src/object_tracking_controller.py:213-250`。
-- **消費**: `GUIController` が最新 `TrackingResult` を保持し、`process_time_ms`/`queue_latency_ms`/`total_latency_ms` を性能表示へ、`track_infos`/`detections` をオーバーレイ描画へ使う。出典 `src/gui_controller.py:555-607,691-718`。
-- **突き合わせ**: GUI は `TrackingResult.frame_id` をキーに、バッファ済みのカメラ画像（`_frame_buffer[fid]`）と結合して描画する。出典 `src/gui_controller.py:599-607`。
+- **消費**: `GUIController` が最新 `TrackingResult` を保持し、`process_time_ms`/`queue_latency_ms`/`total_latency_ms` を性能表示へ、`track_infos`/`detections` をオーバーレイ描画へ使う。出典 `src/gui_controller.py:555-611,701-728`。
+- **突き合わせ**: GUI は `TrackingResult.frame_id` をキーに、バッファ済みのカメラ画像（`_frame_buffer[fid]`）と結合して描画する。出典 `src/gui_controller.py:603-611`。
 
 ## 不変条件 / 前提条件
 
@@ -75,21 +75,21 @@ flowchart LR
 
 - **追跡ゼロ**: `tracked_detections.tracker_id is None` のとき `track_infos` は空リスト。`TrackingResult` 自体は生成される。出典 `src/object_tracking_controller.py:214-222`。
 - **旧フォーマット受信**: レイテンシ2フィールドが無い旧 `TrackingResult` でも、GUI 側 `getattr` で `0.0` 扱い。出典 `src/gui_controller.py:567-572`。
-- **`detections` 欠損/型不一致**: `Any` のため型チェックされない。非 `sv.Detections` が入ると消費側の描画（`gui_controller.py:607` 周辺）で失敗し得る（呼び出し規約に依存）。
+- **`detections` 欠損/型不一致**: `Any` のため型チェックされない。非 `sv.Detections` が入ると消費側の描画（`gui_controller.py:611` 周辺）で失敗し得る（呼び出し規約に依存）。
 
 ## トレードオフ / 設計判断
 
 - **dataclass 集約**: IPC スキーマを1ファイルに集めることで、新メッセージ追加時の参照先を一意化（steering の規約と一致）。出典 `docs/steering/structure.md:47`。
 - **`FrameData` を流さず `FrameRef` を流す**: 大きな `np.ndarray` の pickle コストを避けるゼロコピー設計。`FrameData`（画像同梱）は古い実装の名残で**削除対象**。詳細は [`shared-frame-pool`](../shared-frame-pool/)。
 - **`detections: Any`**: `supervision` 型への静的依存を data_models から外し、循環/重依存を避けた（**推測**）。代償として型安全性は失われる。`Any` 維持が方針（requirements「確定事項」参照）。
-- **`track_infos` と `detections` の二重持ち → 解消方針確定**: `TrackInfo.box`/`score` は未消費でボックス描画は `detections` 側が担う（`src/gui_controller.py:583,652`）。`detections` を正とし、`TrackInfo` は `track_id`/`class_id` の2フィールドへ縮小する（削除タスク化、requirements「確定事項」参照）。
+- **`track_infos` と `detections` の二重持ち → 解消方針確定**: `TrackInfo.box`/`score` は未消費でボックス描画は `detections` 側が担う（`src/gui_controller.py:585,660`）。`detections` を正とし、`TrackInfo` は `track_id`/`class_id` の2フィールドへ縮小する（削除タスク化、requirements「確定事項」参照）。
 - **レイテンシ2値のデフォルト化**: `process_time_ms`（必須）の後ろに追加したため **dataclass の文法制約**でデフォルトが必須。併せて5引数のみの既存生成箇所との後方互換も確保。コミット `0ded396` でフィールド・生成側・消費側 `getattr` を同時追加。出典 `src/data_models.py:52-53`、`src/gui_controller.py:567-572`。
 
 ## 関連コードパス
 
 - `src/data_models.py:12-67` — 全 dataclass 定義（`WorkerError` 含む）
 - `src/object_tracking_controller.py:214-236` — `TrackInfo`/`TrackingResult` の生成
-- `src/gui_controller.py:555-607,691-718` — `TrackingResult` の消費（性能表示・オーバーレイ）
+- `src/gui_controller.py:555-611,701-728` — `TrackingResult` の消費（性能表示・オーバーレイ）
 - `src/camera_controller.py:38-48` / `src/object_tracking_controller.py:46-56` — `WorkerError` の生成（`_report_error`）
 - `src/shared_frame_pool.py:184-255` — `FrameRef` の publish/取得（詳細は [`shared-frame-pool`](../shared-frame-pool/)）
 - `tests/test_shared_frame_pool.py:180,215,218` — `FrameRef` のテスト内生成

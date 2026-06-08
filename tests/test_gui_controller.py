@@ -131,6 +131,19 @@ class GUIControllerTest(unittest.TestCase):
 
         self.assertIsNone(controller._drain_worker_errors())
 
+    def test_safe_class_name_returns_name_in_range(self):
+        names = ["person", "car", "dog"]
+
+        self.assertEqual(GUIController._safe_class_name(names, 0), "person")
+        self.assertEqual(GUIController._safe_class_name(names, 2), "dog")
+
+    def test_safe_class_name_returns_none_out_of_range(self):
+        names = ["person"]
+
+        self.assertIsNone(GUIController._safe_class_name(names, 5))
+        self.assertIsNone(GUIController._safe_class_name(names, -1))
+        self.assertIsNone(GUIController._safe_class_name([], 0))
+
     def test_workers_alive_checks_camera_and_tracking_processes(self):
         controller = object.__new__(GUIController)
         controller.camera_process = _ProcessStub(alive=False)
