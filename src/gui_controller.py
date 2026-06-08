@@ -34,6 +34,7 @@ class GUIController:
         "停止処理中": "#D97706",
         "停止中": "#374151",
         "停止失敗": "#DC2626",
+        "エラー": "#B91C1C",
     }
 
     @staticmethod
@@ -76,6 +77,9 @@ class GUIController:
         self.track_queue: multiprocessing.Queue = multiprocessing.Queue(
             maxsize=max_queue_size
         )
+        # Status channel for fatal worker errors (camera open / model load).
+        # Unbounded: errors are rare and must never be dropped.
+        self.error_queue: multiprocessing.Queue = multiprocessing.Queue()
 
         self.tracking_pool = SharedFramePool(
             n_slots=n_slots,
@@ -123,6 +127,7 @@ class GUIController:
         self._last_overlay_miss_frame_id = None
         self._run_started_at = None
         self._first_frame_logged = False
+        self._worker_error = None
 
         # Supervision Annotators
         self.box_annotator = sv.BoxAnnotator()
@@ -355,6 +360,8 @@ class GUIController:
             self.logger.info(
                 f"Drained {drained_tracks} stale tracking results before restart."
             )
+        self._drain_queue_nowait(self.error_queue)
+        self._worker_error = None
         self._frame_buffer.clear()
         self._frame_timestamps.clear()
         self._latest_track = None
@@ -382,6 +389,7 @@ class GUIController:
             self.tracking_pool.spec,
             self.gui_pool.spec,
             self.stop_event,
+            self.error_queue,
         )
         self.tracking_process = ObjectTrackingController(
             self.config_manager,
@@ -389,6 +397,7 @@ class GUIController:
             self.tracking_pool.spec,
             self.track_queue,
             self.stop_event,
+            self.error_queue,
         )
 
         self.tracking_pool.mark_active()
@@ -477,6 +486,46 @@ class GUIController:
             process is not None and process.is_alive()
             for process in (self.camera_process, self.tracking_process)
         )
+
+    def _drain_worker_errors(self):
+        """Return the first worker error reported since the last check.
+
+        Drains any remaining errors so the queue does not accumulate; the
+        first error is treated as the root cause.
+        """
+        try:
+            first = self.error_queue.get_nowait()
+        except Empty:
+            return None
+        self._drain_queue_nowait(self.error_queue)
+        return first
+
+    def _handle_worker_error(self, error):
+        """Stop everything and surface a worker's fatal error in the GUI."""
+        self.logger.error(
+            f"Worker '{error.source}' reported an error: {error.message}"
+        )
+        self._worker_error = error
+        self.stop_event.set()
+
+        camera_stopped = self._stop_process(self.camera_process, "CameraController")
+        tracking_stopped = self._stop_process(
+            self.tracking_process, "ObjectTrackingController"
+        )
+        if camera_stopped and tracking_stopped:
+            self.tracking_pool.mark_inactive()
+            self.gui_pool.mark_inactive()
+        else:
+            self.logger.error(
+                "Some worker processes are still alive after an error; shared "
+                "frame pools remain active and cannot be reset safely."
+            )
+
+        # Re-enable start so the user can retry after fixing the cause.
+        self.start_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
+        self._set_status("エラー", running=False)
+        self._show_inactive_display(f"エラー: {error.message}")
 
     def _drain_frames(self):
         """Pull every available frame out of the GUI pool and buffer it."""
@@ -669,6 +718,11 @@ class GUIController:
         self.perf_values["display"]["total"].config(text="-")
 
     def _update_gui(self):
+        error = self._drain_worker_errors()
+        if error is not None:
+            self._handle_worker_error(error)
+            return
+
         self._drain_frames()
         self._drain_track_results()
 

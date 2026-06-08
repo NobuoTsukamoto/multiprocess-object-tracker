@@ -14,7 +14,7 @@ import onnxruntime
 import supervision as sv
 
 from config_manager import ConfigManager, LoggingConfig
-from data_models import FrameRef, TrackInfo, TrackingResult
+from data_models import FrameRef, TrackInfo, TrackingResult, WorkerError
 from logger import Logger
 from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
 
@@ -30,6 +30,7 @@ class ObjectTrackingController(multiprocessing.Process):
         frame_pool_spec: SharedFrameSpec,
         track_queue: multiprocessing.Queue,
         stop_event: multiprocessing.Event,
+        error_queue: multiprocessing.Queue,
     ):
         super().__init__()
         self.det_config = config_manager.get_config("detection")
@@ -39,7 +40,20 @@ class ObjectTrackingController(multiprocessing.Process):
         self.frame_pool_spec = frame_pool_spec
         self.track_queue = track_queue
         self.stop_event = stop_event
+        self.error_queue = error_queue
         self.logger = None
+
+    def _report_error(self, message: str):
+        """Send a fatal error to the GUI before exiting the process."""
+        if self.error_queue is None:
+            return
+        try:
+            self.error_queue.put_nowait(
+                WorkerError(source="tracking", message=message, timestamp=time.time())
+            )
+        except Exception:
+            if self.logger is not None:
+                self.logger.error("Failed to report tracking error to GUI.")
 
     def _read_frame(self, frame_pool: SharedFrameAccessor):
         """Read a frame using the configured latency/quality policy."""
@@ -118,6 +132,7 @@ class ObjectTrackingController(multiprocessing.Process):
             input_shape = session.get_inputs()[0].shape[2:]
         except Exception as e:
             self.logger.error(f"Failed to load ONNX model: {e}")
+            self._report_error(f"モデルの読み込みに失敗しました: {e}")
             return
 
         tracker = sv.ByteTrack(

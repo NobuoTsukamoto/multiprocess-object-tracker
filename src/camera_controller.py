@@ -10,6 +10,7 @@ import time
 import cv2
 
 from config_manager import ConfigManager, LoggingConfig
+from data_models import WorkerError
 from logger import Logger
 from shared_frame_pool import SharedFrameAccessor, SharedFrameSpec
 
@@ -22,6 +23,7 @@ class CameraController(multiprocessing.Process):
         tracking_pool_spec: SharedFrameSpec,
         gui_pool_spec: SharedFrameSpec,
         stop_event: multiprocessing.Event,
+        error_queue: multiprocessing.Queue,
     ):
         super().__init__()
         self.config = config_manager.get_config("camera")
@@ -29,8 +31,21 @@ class CameraController(multiprocessing.Process):
         self.tracking_pool_spec = tracking_pool_spec
         self.gui_pool_spec = gui_pool_spec
         self.stop_event = stop_event
+        self.error_queue = error_queue
         self.frame_id = 0
         self.logger = None
+
+    def _report_error(self, message: str):
+        """Send a fatal error to the GUI before exiting the process."""
+        if self.error_queue is None:
+            return
+        try:
+            self.error_queue.put_nowait(
+                WorkerError(source="camera", message=message, timestamp=time.time())
+            )
+        except Exception:
+            if self.logger is not None:
+                self.logger.error("Failed to report camera error to GUI.")
 
     def run(self):
         self.logger = Logger(self.logging_config).get_logger()
@@ -43,6 +58,7 @@ class CameraController(multiprocessing.Process):
         cap = cv2.VideoCapture(0)  # 0 はデフォルトのカメラ
         if not cap.isOpened():
             self.logger.error("Failed to open camera.")
+            self._report_error("カメラを開けませんでした。")
             tracking_pool.close()
             gui_pool.close()
             return

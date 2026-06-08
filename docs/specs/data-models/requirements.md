@@ -7,7 +7,7 @@
 ## 対象 / スコープ
 
 - **対象モジュール/機能**: [`src/data_models.py`](../../../src/data_models.py)（プロセス間通信で受け渡す `@dataclass` 構造体の定義集約）。
-- **スコープ内**: IPC データ構造（`FrameData` / `FrameRef` / `DetectionResult` / `TrackInfo` / `TrackingResult`）のフィールド定義・型・デフォルト値・後方互換性。
+- **スコープ内**: IPC データ構造（`FrameData` / `FrameRef` / `DetectionResult` / `TrackInfo` / `TrackingResult` / `WorkerError`）のフィールド定義・型・デフォルト値・後方互換性。
 - **スコープ外**:
   - これらを **生成/消費する側のロジック**（[`object_tracking_controller.py`](../../../src/object_tracking_controller.py)、[`gui_controller.py`](../../../src/gui_controller.py)、[`shared_frame_pool.py`](../../../src/shared_frame_pool.py)）。
   - 共有メモリのリングバッファ実装（[`shared-frame-pool`](../shared-frame-pool/) を参照）。
@@ -36,19 +36,20 @@
 | R-DM-06 | ユビキタス | システムは `TrackingResult` を `frame_id:int` / `timestamp:float` / `track_infos:List[TrackInfo]` / `detections:Any` / `process_time_ms:float`（必須）に加え、`queue_latency_ms:float=0.0` / `total_latency_ms:float=0.0`（任意）で定義すること。 | `src/data_models.py:43-53` | — |
 | R-DM-07 | オプション | `TrackingResult` の `queue_latency_ms` / `total_latency_ms` が与えられない場合、システムは既定値 `0.0` を採用すること。 | `src/data_models.py:52-53` | — |
 | R-DM-08 | ユビキタス | システムは `TrackingResult.detections` を `Any` 型として宣言し、`supervision.Detections`（推論+追跡後の `tracked_detections`）を格納できるようにすること。 | `src/data_models.py:50` | — |
-| R-DM-09 | ユビキタス | システムは `TrackInfo` と `TrackingResult` の各フィールドを `int`/`float`/`list` 等の **picklable なプリミティブ**で構成し、`multiprocessing.Queue` で安全に転送できるようにすること（`box` は `tolist()` 済みの `list`）。 | `src/data_models.py:35-53`、`src/object_tracking_controller.py:201-221` | — |
-| R-DM-10 | ユビキタス | システムは `TrackingResult` のレイテンシ3値を、`queue_latency_ms`=撮像→推論開始（入力遅延）、`process_time_ms`=推論開始→終了、`total_latency_ms`=撮像→終了 として記録すること。 | `src/object_tracking_controller.py:150,210-211,219` | — |
-| R-DM-11 | ユビキタス | システムは3つのレイテンシが恒等式 `total_latency_ms == queue_latency_ms + process_time_ms`（同一時刻基準）を満たすよう算出すること。 | `src/object_tracking_controller.py:150,210-211` | — |
+| R-DM-09 | ユビキタス | システムは `TrackInfo` と `TrackingResult` の各フィールドを `int`/`float`/`list` 等の **picklable なプリミティブ**で構成し、`multiprocessing.Queue` で安全に転送できるようにすること（`box` は `tolist()` 済みの `list`）。 | `src/data_models.py:35-53`、`src/object_tracking_controller.py:214-236` | — |
+| R-DM-10 | ユビキタス | システムは `TrackingResult` のレイテンシ3値を、`queue_latency_ms`=撮像→推論開始（入力遅延）、`process_time_ms`=推論開始→終了、`total_latency_ms`=撮像→終了 として記録すること。 | `src/object_tracking_controller.py:165,225-226,234` | — |
+| R-DM-11 | ユビキタス | システムは3つのレイテンシが恒等式 `total_latency_ms == queue_latency_ms + process_time_ms`（同一時刻基準）を満たすよう算出すること。 | `src/object_tracking_controller.py:165,225-226` | — |
+| R-DM-12 | ユビキタス | システムは `WorkerError` を `source:str`（"camera"/"tracking"）/ `message:str` / `timestamp:float` の3フィールドで定義し、ワーカープロセスが GUI（メインプロセス）へ致命エラーを通知する picklable な値オブジェクトとして用いること。 | `src/data_models.py:56-67` | — |
 
 ## 前提条件 / 不変条件
 
-- **生成側の責務**: `TrackInfo` は `tracker_id is not None` の検出に対してのみ生成され、`box` は numpy 配列を `tolist()` で `list[float]` に、`track_id`/`class_id` は `int()`、`score` は `float()` にキャストして詰める。出典 `src/object_tracking_controller.py:199-207`。
-- **`frame_id` による突き合わせ**: `TrackingResult.frame_id` は元フレーム（`FrameRef.frame_id`）と一致し、GUI 側はこの ID でカメラ画像と追跡結果を突き合わせる。出典 `src/object_tracking_controller.py:213-216`、`src/gui_controller.py:550-558`。
-- **`timestamp` の意味**: `FrameRef.timestamp` / `TrackingResult.timestamp` は撮像時刻で、レイテンシ算出（`(now - timestamp)*1000`）の基準になる。出典 `src/object_tracking_controller.py:211`、`src/gui_controller.py:497,500`。
-- **後方互換アクセス**: 消費側は `queue_latency_ms` / `total_latency_ms` を `getattr(latest, "...", 0.0)` で読み、旧 `TrackingResult` でも欠落を許容する。一方 `process_time_ms` は直接アクセス（`getattr` なし）で、これが当初からの必須フィールドであることを裏付ける。出典 `src/gui_controller.py:517`（直接）, `:518-522`（getattr）。
-- **`detections` の所有**: `TrackingResult.detections` には推論+NMS+追跡を経た `tracked_detections`（`sv.Detections`）が入り、GUI のオーバーレイ描画に使われる。出典 `src/object_tracking_controller.py:217`、`src/gui_controller.py:558`。
-- **レイテンシ恒等式（R-DM-11）**: 3値は同一の `start_time`/`end_time`/`frame_ref.timestamp` から算出されるため、`total_latency_ms == queue_latency_ms + process_time_ms` が（浮動小数の誤差を除き）厳密に成立する。出典 `src/object_tracking_controller.py:148-150,209-211`。
-- **`track_infos` と `detections` の重複**: 同一の追跡結果が `track_infos`（`List[TrackInfo]`）と `detections`（`sv.Detections`）に二重に格納される。GUI は `track_infos` から `track_id`/`class_id` のみ（リスト表示用）、ボックス描画は `detections` から行う。出典 `src/gui_controller.py:528-534,603`。
+- **生成側の責務**: `TrackInfo` は `tracker_id is not None` の検出に対してのみ生成され、`box` は numpy 配列を `tolist()` で `list[float]` に、`track_id`/`class_id` は `int()`、`score` は `float()` にキャストして詰める。出典 `src/object_tracking_controller.py:214-222`。
+- **`frame_id` による突き合わせ**: `TrackingResult.frame_id` は元フレーム（`FrameRef.frame_id`）と一致し、GUI 側はこの ID でカメラ画像と追跡結果を突き合わせる。出典 `src/object_tracking_controller.py:228-231`、`src/gui_controller.py:599-607`。
+- **`timestamp` の意味**: `FrameRef.timestamp` / `TrackingResult.timestamp` は撮像時刻で、レイテンシ算出（`(now - timestamp)*1000`）の基準になる。出典 `src/object_tracking_controller.py:226`、`src/gui_controller.py:546,549`。
+- **後方互換アクセス**: 消費側は `queue_latency_ms` / `total_latency_ms` を `getattr(latest, "...", 0.0)` で読み、旧 `TrackingResult` でも欠落を許容する。一方 `process_time_ms` は直接アクセス（`getattr` なし）で、これが当初からの必須フィールドであることを裏付ける。出典 `src/gui_controller.py:566`（直接）, `:567-572`（getattr）。
+- **`detections` の所有**: `TrackingResult.detections` には推論+NMS+追跡を経た `tracked_detections`（`sv.Detections`）が入り、GUI のオーバーレイ描画に使われる。出典 `src/object_tracking_controller.py:232`、`src/gui_controller.py:607`。
+- **レイテンシ恒等式（R-DM-11）**: 3値は同一の `start_time`/`end_time`/`frame_ref.timestamp` から算出されるため、`total_latency_ms == queue_latency_ms + process_time_ms` が（浮動小数の誤差を除き）厳密に成立する。出典 `src/object_tracking_controller.py:163-165,224-226`。
+- **`track_infos` と `detections` の重複**: 同一の追跡結果が `track_infos`（`List[TrackInfo]`）と `detections`（`sv.Detections`）に二重に格納される。GUI は `track_infos` から `track_id`/`class_id` のみ（リスト表示用）、ボックス描画は `detections` から行う。出典 `src/gui_controller.py:577-583,652`。
 
 ## 確定事項（レビュー反映済み）
 

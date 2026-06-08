@@ -19,6 +19,7 @@
 | R-DM-09 (picklability) | — | ⬜ 未カバー |
 | R-DM-10 (レイテンシ定義) | — | ⬜ 未カバー |
 | R-DM-11 (レイテンシ恒等式) | — | ⬜ 未カバー |
+| R-DM-12 (`WorkerError`) | — | ⬜ 未カバー（実装済み・新規） |
 
 ## タスク
 
@@ -37,7 +38,7 @@
 > 「`Any` のまま、supervision バージョンアップ時に直してテストパスで OK」という方針が機能する前提。
 > 下記が無いと描画が壊れても CI がグリーンのまま通る（requirements「確定事項」参照）。
 - [ ] **pickle 往復テスト**: 実 `sv.Detections` を `detections` に入れた `TrackingResult` を pickle→unpickle し、`len()`/`.confidence`/`.class_id`/`.tracker_id` が復元されることを検証（R-DM-08/09）。
-- [ ] **GUI 描画スモークテスト**: 実 `sv.Detections` を `_render_image`（`src/gui_controller.py:591-606`）経路に通し、`.confidence`/`.class_id`/`.tracker_id` 参照と annotator 再投入が成立することを確認。
+- [ ] **GUI 描画スモークテスト**: 実 `sv.Detections` を `_render_image`（`src/gui_controller.py:640-655`）経路に通し、`.confidence`/`.class_id`/`.tracker_id` 参照と annotator 再投入が成立することを確認。
 
 ### 実装 / 改善（将来）
 - [ ] `TrackingResult.detections` の `Any` を見直し（`TYPE_CHECKING` 下での `sv.Detections` 注釈導入）。型安全性と循環依存回避のバランスを検討。
@@ -49,7 +50,7 @@
 - [ ] `docs/steering/structure.md:21` の「`FrameData/FrameRef/Detection/Track*`」注記を実態に合わせて更新。
 - [ ] 削除後、`R-DM-02`（FrameData）・`R-DM-04`（DetectionResult）を requirements.md から除去し ID を整理。
 - [ ] ✅確定: `TrackInfo` から `box`（:39）・`score`（:40）を削除し、`track_id`/`class_id` の2フィールドへ縮小（detections に一本化）。
-- [ ] 併せて生成側 `src/object_tracking_controller.py:201-207` の `box=`/`score=` を除去。
+- [ ] 併せて生成側 `src/object_tracking_controller.py:216-221` の `box=`/`score=` を除去。
 - [ ] 縮小後に `R-DM-05` の定義を2フィールドへ更新。
 
 ## メモ / 申し送り

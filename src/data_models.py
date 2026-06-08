@@ -51,3 +51,16 @@ class TrackingResult:
     process_time_ms: float
     queue_latency_ms: float = 0.0
     total_latency_ms: float = 0.0
+
+
+@dataclass
+class WorkerError:
+    """Fatal error reported by a worker process to the GUI (main) process.
+
+    Sent on a dedicated status queue so the GUI can distinguish an error
+    exit from a normal (stop_event-driven) exit and surface the reason.
+    """
+
+    source: str  # "camera" | "tracking"
+    message: str
+    timestamp: float

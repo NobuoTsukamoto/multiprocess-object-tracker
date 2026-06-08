@@ -21,7 +21,10 @@
 | R-GUI-25〜28（GUI ループ/drain/結果保持） | — | ⬜ 未カバー |
 | R-GUI-32〜36（空バッファ/描画/減光/状態色） | — | ⬜ 未カバー |
 | R-GUI-38〜41, R-GUI-43（終了/cleanup/mainloop） | — | ⬜ 未カバー |
-| R-GUI-44（ワーカーエラー通知） | — | ⬜ 未カバー（改修予定・方針確定） |
+| R-GUI-44（ワーカーエラー→全停止+表示） | （`_handle_worker_error` 直接テストは未） | ⬜ 部分（実装済み） |
+| R-GUI-46（error_queue 生成/受け渡し） | — | ⬜ 未カバー（実装済み） |
+| R-GUI-47（error_queue drain） | `test_drain_worker_errors_returns_first_and_drains_rest` / `..._returns_none_when_empty` | ✅ カバー済み |
+| R-GUI-48（開始時のエラーリセット） | — | ⬜ 未カバー（実装済み） |
 | R-GUI-45（class_id 範囲外は無視） | — | ⬜ 未カバー（改修予定・方針確定） |
 
 ## タスク
@@ -38,9 +41,12 @@
 - [ ] `_stop_process`/`_terminate_process_if_alive` の段階的終了（join→terminate→kill）（R-GUI-23, R-GUI-24）を `Process` スタブで検証。
 - [ ] `_update_gui` の render_key 差分（変化時のみ再描画）（R-GUI-33）を `_render_image` モックで検証。
 
-### 実装（✅方針確定・他 spec と連動）
-- [ ] **ワーカーエラー通知の受信＋GUI 表示**（R-GUI-44）: camera R-CAM-14（オープン失敗）/ tracking R-OTC-23（ONNX ロード失敗）と**共通の専用通知**を受け、GUI に**専用エラー状態（専用の状態色＋エラー文）**を表示する。通知機構はエラー内容を運べる**ステータス Queue を推奨**（最終確定は実装時、3 モジュール横断で実装）。
-- [ ] 上記に伴い `stop_tracking` の「停止失敗」と「ワーカーの自然死/エラー死」を区別できるようにする（現状はプロセス生存有無のみで判定）。
+### 実装（✅完了）
+- [x] **ワーカーエラー通知の受信＋GUI 表示**（R-GUI-44, R-GUI-46〜48）: `data_models.WorkerError` を専用 `error_queue`（無制限 `multiprocessing.Queue`）で受け、`_handle_worker_error` で全停止→状態「エラー」（専用色＋メッセージ）→開始再有効化。camera R-CAM-14 / tracking R-OTC-23 と共通機構。**機構はステータス Queue に確定**。
+- [x] `error_queue` 受信で「ワーカーの自然死/エラー死」を区別（自然死=stop_event 起因、エラー死=WorkerError 受信）。
+- [ ] **`_handle_worker_error` の直接テスト**（R-GUI-44）: プロセス/プール stub で「stop_event セット・mark_inactive・状態エラー・開始再有効化」を検証（現状は drain 部のみカバー）。
+
+### 実装（✅方針確定・未着手）
 - [ ] **`class_id` 範囲外は無視**（R-GUI-45）: `_drain_track_results`（`:526-535`）と `_render_image`（`:591-606`）の `class_names[class_id]` を範囲チェックし、範囲外の項目はスキップして表示継続（例外で止めない）。
 
 ### 実装 / 改善（将来）
@@ -51,7 +57,7 @@
 
 ## メモ / 申し送り
 
-- ✅ ワーカーエラー通知（R-GUI-44）は camera R-CAM-14 / tracking R-OTC-23 と**同一の専用通知**で受け、GUI に専用エラー状態を表示する（方針確定）。機構はエラー内容を運べる**ステータス Queue を推奨**（最終確定は実装時）。
+- ✅ ワーカーエラー通知（R-GUI-44）は **実装済み**。`data_models.WorkerError` を専用 `error_queue`（`multiprocessing.Queue`、無制限）で受け、全停止＋状態「エラー」表示＋開始再有効化。camera R-CAM-14 / tracking R-OTC-23 と共通機構（**ステータス Queue に確定**）。
 - ✅ 「停止失敗」後はアプリ再起動で復帰（R-GUI-22、最低限実装で許容）。
 - ✅ `class_id` 範囲外（`class_names` 添字外）は**無視**して表示継続（R-GUI-45）。
 - 🔎 `frame_read_policy`/`max_frame_skip` は **GUI 表示側に作用しない**（コード確認済み）。GUI は全カメラフレームをバッファ＋最新追跡結果で同期表示。ポリシーは tracking ワーカー入力読み出し専用。

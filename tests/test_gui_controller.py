@@ -116,6 +116,21 @@ class GUIControllerTest(unittest.TestCase):
         self.assertEqual(controller._overlay_miss_count, 0)
         self.assertEqual(controller.logger.warning_messages, [])
 
+    def test_drain_worker_errors_returns_first_and_drains_rest(self):
+        controller = object.__new__(GUIController)
+        err1 = SimpleNamespace(source="camera", message="m1", timestamp=1.0)
+        err2 = SimpleNamespace(source="tracking", message="m2", timestamp=2.0)
+        controller.error_queue = _QueueStub([err1, err2])
+
+        self.assertIs(controller._drain_worker_errors(), err1)
+        self.assertEqual(controller.error_queue.items, [])
+
+    def test_drain_worker_errors_returns_none_when_empty(self):
+        controller = object.__new__(GUIController)
+        controller.error_queue = _QueueStub([])
+
+        self.assertIsNone(controller._drain_worker_errors())
+
     def test_workers_alive_checks_camera_and_tracking_processes(self):
         controller = object.__new__(GUIController)
         controller.camera_process = _ProcessStub(alive=False)

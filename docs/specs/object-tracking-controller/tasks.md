@@ -9,7 +9,7 @@
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
 | R-OTC-01〜04（init/ロード） | — | ⬜ 未カバー |
-| R-OTC-05（ONNX 失敗→終了） | — | ⬜ 未カバー |
+| R-OTC-05（ONNX 失敗→通知→終了） | — | ⬜ 未カバー（実装済み） |
 | R-OTC-06（ByteTrack 初期化） | — | ⬜ 未カバー |
 | R-OTC-07（アタッチ） | — | ⬜ 未カバー |
 | R-OTC-08（stop までループ） | — | ⬜ 未カバー |
@@ -27,7 +27,7 @@
 | R-OTC-20（queue Full→drop-oldest） | — | ⬜ 未カバー |
 | R-OTC-21（PERFORMANCE ログ） | — | ⬜ 未カバー |
 | R-OTC-22（finally 後始末） | — | ⬜ 未カバー |
-| R-OTC-23（ONNX 失敗→GUI 通知） | — | ⬜ 未カバー（改修予定） |
+| R-OTC-23（ONNX 失敗→GUI 通知） | — | ⬜ 未カバー（実装済み） |
 
 ## タスク
 
@@ -45,8 +45,9 @@
   - [ ] `track_queue` Full 時の drop-oldest（R-OTC-20）。
   - [ ] ONNX ロード失敗で早期 return（R-OTC-05、`InferenceSession` モック）。
 
-### 実装（✅確定）
-- [ ] **ONNX ロード失敗の GUI 通知**（R-OTC-23、機構確定）: error ログに加え GUI へ**専用エラー通知**。通知機構は camera-controller R-CAM-14 / [`gui-controller`](../gui-controller/) R-GUI-44 と**共通**（**ステータス Queue 推奨**、最終形は実装時確定）。コンストラクタ引数追加と GUI 側ハンドリング（専用エラー表示）を併せて実装。
+### 実装（✅完了）
+- [x] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`_report_error`、`object_tracking_controller.py:46-56,135`）。コンストラクタに `error_queue` 引数を追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。
+- [ ] **`_report_error` のテスト**（R-OTC-05/23）: `error_queue` スタブで ONNX ロード失敗時に `WorkerError` が put され早期 return することを検証。
 - [ ] **検出閾値の設定化**（config-manager で決定）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold` に差し替え（`object_tracking_controller.py:189-190`）。
 
 ### 実装 / 改善（将来）
@@ -57,7 +58,7 @@
 
 ## メモ / 申し送り
 
-- ✅ ONNX ロード失敗は **GUI へ専用エラー通知**（R-OTC-23、camera R-CAM-14 / gui R-GUI-44 と同一機構・ステータス Queue 推奨、最終形は実装時確定）。
+- ✅ ONNX ロード失敗は **GUI へ専用エラー通知**（R-OTC-23、**実装済み**。`error_queue` + `WorkerError`、camera R-CAM-14 / gui R-GUI-44 と同一機構・ステータス Queue に確定）。
 - ✅ 当面 **YOLOX 固定**で進める（他モデル対応は将来）。
 - 🔁 **他 spec 確定の反映**: `0.1`/`0.45` は config-manager で `detection_threshold`/`nms_iou_threshold` にキー化決定済み。本モジュールで消費差し替え。
 - 🔎 `_read_frame` は `read`(2-tuple)/`read_latest`(3-tuple) を `(frame_ref, image, skipped)` に正規化（`fifo` は skip=0）。

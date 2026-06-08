@@ -39,6 +39,7 @@ multiprocess-object-tracker/
   - スロット所有権の不変条件: free_queue ↔ data_queue 間でスロット番号を受け渡し、二重所有を避ける。`reset_free_slots()` は **全ワーカー停止後のみ**呼ぶこと（[`shared_frame_pool.py`](../../src/shared_frame_pool.py) の guard 参照）。
 - **追跡結果**: `TrackingResult`（frame_id/timestamp/track_infos/detections/各種 latency）を `multiprocessing.Queue` で GUI に送る。GUI 側は frame_id でカメラ画像と突き合わせる。
 - **停止通知**: `multiprocessing.Event`（stop_event）。ワーカーは監視し、セットされたらリソース解放して終了する。
+- **エラー通知**: ワーカーの致命エラー（カメラオープン失敗・ONNX ロード失敗）は `WorkerError`(source, message, timestamp) を専用の `error_queue`（`multiprocessing.Queue`、GUI が owner）で GUI に送る。GUI は受信すると全ワーカーを停止し状態「エラー」を表示する。プロセスの自然死（stop_event 起因）とエラー終了を区別するための経路（[`data_models.py`](../../src/data_models.py) の `WorkerError`、gui-controller R-GUI-44 / camera R-CAM-14 / tracking R-OTC-23）。
 - **読み出しポリシー**: `fifo`（全フレーム）/ `latest`（最新まで読み飛ばし）/ `bounded_latest`（最大 `max_frame_skip` まで読み飛ばし）。設定 `tracking.frame_read_policy` / `tracking.max_frame_skip`。
 
 ## 命名・記述規約
