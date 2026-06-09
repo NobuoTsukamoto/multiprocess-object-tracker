@@ -7,7 +7,7 @@ See the LICENSE file in the project root for more information.
 import argparse
 import sys
 from gui_controller import GUIController
-from config_manager import ConfigManager
+from config_manager import ConfigManager, EmptyConfigError
 from logger import Logger
 
 
@@ -37,6 +37,9 @@ def main():
 
     except FileNotFoundError:
         print(f"Error: Configuration file not found at {args.config}", file=sys.stderr)
+        sys.exit(1)
+    except EmptyConfigError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"An unexpected error occurred: {e}", file=sys.stderr)

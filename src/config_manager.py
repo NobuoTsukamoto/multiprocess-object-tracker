@@ -66,13 +66,22 @@ class AppConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
+class EmptyConfigError(ValueError):
+    """Raised when the configuration file is empty (YAML parses to None)."""
+
+
 class ConfigManager:
     def __init__(self, config_path: str):
         self.config = self._load_config(config_path)
 
     def _load_config(self, config_path: str) -> AppConfig:
-        with open(config_path, "r") as f:
+        # Always read as UTF-8 so non-ASCII content (comments, paths, class
+        # names) loads regardless of the platform default encoding (e.g.
+        # cp932 on Japanese Windows).
+        with open(config_path, "r", encoding="utf-8") as f:
             config_dict = yaml.safe_load(f)
+        if config_dict is None:
+            raise EmptyConfigError(f"Configuration file is empty: {config_path}")
         return self._create_app_config(config_dict)
 
     def _create_app_config(self, config_dict: Dict[str, Any]) -> AppConfig:
