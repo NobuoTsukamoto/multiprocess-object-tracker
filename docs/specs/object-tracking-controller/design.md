@@ -36,7 +36,7 @@ FRAME_READ_TIMEOUT_SEC = 0.1   # 読み出しタイムアウト（:22）
 
 - インスタンス: `det_config`/`track_config`/`camera_config`、`logging_config`、`frame_pool_spec`、`track_queue`、`stop_event`、`error_queue`、`logger`。出典 `:36-44`。
 - 子プロセスローカル: `session`（ONNX）、`tracker`（ByteTrack）、`frame_pool`（Accessor）、計測変数（`frame_count`/`perf_start_time`/`last_*`）。出典 `:128-152`。
-- 出力: `TrackingResult`（[`data-models`](../data-models/)）。`detections` には ByteTrack 後の `sv.Detections` を格納。出典 `:228-236`。
+- 出力: `TrackingResult`（[`data-models`](../data-models/)）。`detections` には ByteTrack 後の `sv.Detections` を格納。出典 `:226-234`。
 
 ## データフロー / 制御フロー
 
@@ -59,15 +59,15 @@ flowchart TD
     Q --> PERF[performance_interval ごとに PERFORMANCE ログ] --> R
 ```
 
-出典: `src/object_tracking_controller.py:153-269`。なお ONNX ロード失敗時はループに入る前に `_report_error`→`return`（`:133-136`）。
+出典: `src/object_tracking_controller.py:153-267`。なお ONNX ロード失敗時はループに入る前に `_report_error`→`return`（`:133-136`）。
 
 ## 不変条件 / 前提条件
 
 - **子プロセス内構築**: Logger/Accessor/ONNX/ByteTrack は `run()` で生成。出典 `:125,128,138,145`。
 - **戻り正規化**: `_read_frame` は常に `(frame_ref, image, skipped_count)`。出典 `:62-80`。
-- **`frame_id` 突合**: `TrackingResult.frame_id == FrameRef.frame_id`。出典 `:229`。
-- **レイテンシ恒等式**: `total == queue + process`（同一 `start_time`/`end_time`/`timestamp`）。出典 `:163-165,224-226`。
-- **新しさ優先**: `track_queue` は最大 `max_queue_length`。Full 時は最古を捨て最新を入れる。出典 `:238-250`、`src/gui_controller.py:77-79`。
+- **`frame_id` 突合**: `TrackingResult.frame_id == FrameRef.frame_id`。出典 `:227`。
+- **レイテンシ恒等式**: `total == queue + process`（同一 `start_time`/`end_time`/`timestamp`）。出典 `:163-165,222-224`。
+- **新しさ優先**: `track_queue` は最大 `max_queue_length`。Full 時は最古を捨て最新を入れる。出典 `:236-248`、`src/gui_controller.py:77-79`。
 - **エラー通知は送出のみ**: `_report_error` は `error_queue` に置いて `return` するだけ。停止判断は GUI（R-GUI-44）。出典 `:46-56,133-136`。
 
 ## エッジケース / 異常系
@@ -75,8 +75,8 @@ flowchart TD
 - **ONNX ロード失敗**: error ログ→`error_queue` へ `WorkerError(source="tracking", ...)`→`return`（プロセス終了）。**実装済み**: GUI が状態「エラー」を表示（R-OTC-23、camera R-CAM-14 / [`gui-controller`](../gui-controller/) R-GUI-44 と同一機構・ステータス Queue に確定）。出典 `:46-56,133-136`。
 - **読み出しタイムアウト**: `Empty`→continue（フレーム未着でも CPU を無駄に回さない）。出典 `:158-159`。
 - **未知ポリシー**: warning＋`bounded_latest` フォールバック。出典 `:75-80`。
-- **空検出 / tracker_id None**: `track_infos` 空のまま `TrackingResult` を送出。出典 `:214-222`。
-- **track_queue Full**: 最古を捨てて再 put、なお Full なら warning。出典 `:238-250`。
+- **空検出 / tracker_id None**: `track_infos` 空のまま `TrackingResult` を送出。出典 `:213-220`。
+- **track_queue Full**: 最古を捨てて再 put、なお Full なら warning。出典 `:236-248`。
 - **停止の二重チェック**: ループ先頭と読み出し直後で `stop_event` を確認し、停止指示への反応を速める。出典 `:154,160-161`。
 
 ## トレードオフ / 設計判断
@@ -91,6 +91,6 @@ flowchart TD
 
 - `src/object_tracking_controller.py:25-272` — 本体
 - `src/shared_frame_pool.py:204-271` — `read`/`read_latest`（[`shared-frame-pool`](../shared-frame-pool/)）
-- `src/data_models.py:35-53` — `TrackInfo`/`TrackingResult`、`:56-67` — `WorkerError`（[`data-models`](../data-models/)）
+- `src/data_models.py:20-36` — `TrackInfo`/`TrackingResult`、`:39-49` — `WorkerError`（[`data-models`](../data-models/)）
 - `src/config_manager.py:20-37` — `DetectionConfig`/`TrackingConfig`
 - `src/gui_controller.py:77-79,386-401` — `track_queue`/`error_queue` 生成・プロセス起動

@@ -82,4 +82,4 @@ flowchart LR
 - `src/shared_frame_pool.py:41-53` — `_get_nowait_with_retry`
 - `src/shared_frame_pool.py:67-150` — owner
 - `src/shared_frame_pool.py:153-280` — accessor
-- `src/data_models.py:19-25` — `FrameRef`
+- `src/data_models.py:11-17` — `FrameRef`

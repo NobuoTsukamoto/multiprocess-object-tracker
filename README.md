@@ -123,9 +123,7 @@ classDiagram
     CameraController --> Logger
     ObjectTrackingController --> Logger
     GUIController --> Logger
-    CameraController --> FrameData
     ObjectTrackingController --> TrackInfo
-    ObjectTrackingController --> FrameData
 
     class ConfigManager {
         +load_config()
@@ -144,15 +142,9 @@ classDiagram
     class GUIController {
         +run()
     }
-    class FrameData {
-        +image
-        +timestamp
-    }
     class TrackInfo {
         +track_id
         +class_id
-        +box
-        +score
     }
 ```
 

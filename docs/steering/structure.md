@@ -18,7 +18,7 @@ multiprocess-object-tracker/
 │   ├── shared_frame_pool.py     # 共有メモリ・リングバッファ（プロセス間フレーム転送）
 │   ├── config_manager.py        # 設定読み込み（dataclass 階層）
 │   ├── logger.py                # loguru ラッパ（PERFORMANCE レベル）
-│   └── data_models.py           # IPC データ構造（FrameData/FrameRef/Detection/Track*）
+│   └── data_models.py           # IPC データ構造（FrameRef/TrackInfo/TrackingResult/WorkerError）
 ├── tests/                       # 単体テスト（unittest, pytest 実行可）
 └── docs/                        # steering / specs（本ドキュメント群）
 ```

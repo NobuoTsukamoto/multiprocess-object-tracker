@@ -132,7 +132,7 @@ flowchart LR
 - **フレームバッファ上限 = 秒×fps**: 推論が遅れても一致フレームを保持できるよう `frame_buffer_seconds` 分を確保。下限は `max_queue_length+2`。バッファが小さいとオーバーレイミスが増える。出典 `:40-45,113-120,619-642`。
 - **borderless maximized + キーバインド**: 没入表示のためタイトルバーを消すが、クローズ手段が失われるので `Escape`/`Alt-F4` を明示バインド（**コメントに意図明記**）。出典 `:151-157`。
 - **段階的強制終了**: graceful join → terminate → kill。確実な後始末と、無応答ワーカーでの UI 凍結回避のバランス。出典 `:456-482`。
-- **ワーカーエラーの可視化（実装済み・機構確定）**: ワーカーがエラーで `return` するだけでは GUI は区別できず「停止失敗」や無音停止になる。これを解消するため、camera R-CAM-14 / tracking R-OTC-23 と**共通の専用通知**として `data_models.WorkerError`（`source`/`message`/`timestamp`）を**無制限の `error_queue`（`multiprocessing.Queue`）** で GUI に送る。GUI は `_update_gui` 冒頭で `error_queue` を確認し、エラーがあれば `_handle_worker_error` で `stop_event` を立てて全停止 → 状態「エラー」＋メッセージ表示 → 開始ボタン再有効化（再試行可）へ遷移する。Event ではなくエラー内容を運べる Queue を採用した。出典 `:80-82,490-528,730-734`、`src/data_models.py:56-67`。
+- **ワーカーエラーの可視化（実装済み・機構確定）**: ワーカーがエラーで `return` するだけでは GUI は区別できず「停止失敗」や無音停止になる。これを解消するため、camera R-CAM-14 / tracking R-OTC-23 と**共通の専用通知**として `data_models.WorkerError`（`source`/`message`/`timestamp`）を**無制限の `error_queue`（`multiprocessing.Queue`）** で GUI に送る。GUI は `_update_gui` 冒頭で `error_queue` を確認し、エラーがあれば `_handle_worker_error` で `stop_event` を立てて全停止 → 状態「エラー」＋メッセージ表示 → 開始ボタン再有効化（再試行可）へ遷移する。Event ではなくエラー内容を運べる Queue を採用した。出典 `:80-82,490-528,730-734`、`src/data_models.py:39-49`。
 - **「停止失敗」後はアプリ再起動で復帰（最低限実装で許容）**: `stop_event.set()` 済みのため停止失敗時は `_update_gui` が止まり表示が固まる。リカバリ導線は設けず、アプリ再起動を前提とする（R-GUI-22、確定）。出典 `:444-454,762-763`。
 - **`max_frame_skip`/`frame_read_policy` は表示側に作用しない（コード確認済み）**: `gui_controller.py` はこれらのキーを参照しない。`_drain_frames` は `read_nowait` をループで全フレームをバッファ（`frame_buffer_max` 超過分のみ最古を破棄）、`_drain_track_results` は最新 `TrackingResult` のみ保持する。読み飛ばしポリシーは **tracking ワーカーの入力読み出しにのみ作用**し、GUI 表示側の挙動は「全カメラフレームをバッファ＋最新追跡結果で同期表示」で固定。出典 `:530-572`。
 
@@ -143,6 +143,6 @@ flowchart LR
 - `src/shared_frame_pool.py` — `SharedFramePool`/`SharedFrameAccessor`（`spec`/`mark_active`/`mark_inactive`/`reset_free_slots`/`cleanup`/`read_nowait`/`close`、[`shared-frame-pool`](../shared-frame-pool/)）
 - `src/camera_controller.py` — 生成するワーカー（[`camera-controller`](../camera-controller/)）
 - `src/object_tracking_controller.py` — 生成するワーカー（[`object-tracking-controller`](../object-tracking-controller/)）
-- `src/data_models.py:35-67` — `TrackInfo`/`TrackingResult`/`WorkerError`（[`data-models`](../data-models/)）
+- `src/data_models.py:20-49` — `TrackInfo`/`TrackingResult`/`WorkerError`（[`data-models`](../data-models/)）
 - `src/camera_controller.py:38-48,76` / `src/object_tracking_controller.py:46-56,135` — `_report_error`（ワーカー側送出）
 - `src/config_manager.py:40-49` — `GuiConfig`、`:12-17` — `CameraConfig`（[`config-manager`](../config-manager/)）

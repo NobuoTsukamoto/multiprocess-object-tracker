@@ -9,10 +9,10 @@
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
 | R-DM-01 | — | ⬜ 未カバー |
-| R-DM-02 (`FrameData`) | — | 🗑️ 削除対象（src 未使用） |
+| R-DM-02 (`FrameData`) | — | 🗑️ 削除済み |
 | R-DM-03 (`FrameRef`) | `tests/test_shared_frame_pool.py:180,215,218`（生成のみ） | 🟡 部分的（フィールド契約は未検証） |
-| R-DM-04 (`DetectionResult`) | — | 🗑️ 削除対象（src 未使用） |
-| R-DM-05 (`TrackInfo`) | — | ⬜ 未カバー / 🗑️ `box`/`score` 削除予定 |
+| R-DM-04 (`DetectionResult`) | — | 🗑️ 削除済み |
+| R-DM-05 (`TrackInfo`、2フィールドへ縮小済み） | — | ⬜ 未カバー（実装済み） |
 | R-DM-06 (`TrackingResult`) | — | ⬜ 未カバー |
 | R-DM-07 (デフォルト値) | — | ⬜ 未カバー |
 | R-DM-08 (`detections: Any`) | — | ⬜ 未カバー |
@@ -24,11 +24,11 @@
 ## タスク
 
 ### 文書化 / 整合
-- [ ] `TrackInfo.box` の座標系（`xyxy`・ピクセル単位、✅確定）を data_models の docstring に明記。
+- [x] `TrackInfo.box`/`score` を削除したため、box 座標系（xyxy）の論点は `detections`（`sv.Detections.xyxy`）に一本化（対応不要）。
 - [ ] `TrackingResult.detections` が `supervision.Detections` を保持する旨を docstring/型注釈（`"sv.Detections"` 文字列注釈等）で明示。
 - [ ] レイテンシ3値の定義（R-DM-10）と恒等式 `total == queue + process`（R-DM-11）を `TrackingResult` の docstring に明記。
 - [ ] ✅方針確定: `queue_latency_ms` は**リネームせず**、`TrackingResult` の docstring に「撮像→推論開始の入力遅延（共有プール待ち含む）」と定義を明記。
-- [ ] steering（`structure.md:21,47`）の「IPC データ構造」記述と本 spec のリンクを相互参照。
+- [ ] steering（`structure.md:21,48`）の「IPC データ構造」記述と本 spec のリンクを相互参照。
 
 ### テスト
 - [ ] `tests/test_data_models.py` を新設し、各 dataclass のフィールド/型/デフォルト値（R-DM-05〜07）を検証。
@@ -44,21 +44,21 @@
 - [ ] `TrackingResult.detections` の `Any` を見直し（`TYPE_CHECKING` 下での `sv.Detections` 注釈導入）。型安全性と循環依存回避のバランスを検討。
 - [ ] dataclass に `frozen=True` / `slots=True` を導入し、不変性・メモリ効率を検討（IPC 値オブジェクトとして妥当か要評価）。
 
-### コード削除（✅確定: FrameData / DetectionResult は削除対象）
-- [ ] `src/data_models.py` から `FrameData`（:12-16）と `DetectionResult`（:28-32）を削除。
-- [ ] `README.md` の該当記述を削除/修正（`:52-56` の説明、`:125-127` のクラス図エッジ、`:146-149` の `FrameData` クラス図）。
-- [ ] `docs/steering/structure.md:21` の「`FrameData/FrameRef/Detection/Track*`」注記を実態に合わせて更新。
-- [ ] 削除後、`R-DM-02`（FrameData）・`R-DM-04`（DetectionResult）を requirements.md から除去し ID を整理。
-- [ ] ✅確定: `TrackInfo` から `box`（:39）・`score`（:40）を削除し、`track_id`/`class_id` の2フィールドへ縮小（detections に一本化）。
-- [ ] 併せて生成側 `src/object_tracking_controller.py:216-221` の `box=`/`score=` を除去。
-- [ ] 縮小後に `R-DM-05` の定義を2フィールドへ更新。
+### コード削除（✅完了）
+- [x] `src/data_models.py` から `FrameData` と `DetectionResult` を削除（不要になった `import numpy as np` も除去）。
+- [x] `README.md` のクラス図から `FrameData` クラス・エッジを削除。
+- [x] `docs/steering/structure.md:21` の `data_models.py` 注記を実態（`FrameRef/TrackInfo/TrackingResult/WorkerError`）へ更新。
+- [x] `R-DM-02`（FrameData）・`R-DM-04`（DetectionResult）は ID を保持しつつ「削除済み」へ更新（ID 安定のため除去せず）。
+- [x] `TrackInfo` から `box`/`score` を削除し、`track_id`/`class_id` の2フィールドへ縮小（detections に一本化）。
+- [x] 併せて生成側 `src/object_tracking_controller.py:213-220` の `box=`/`score=` を除去。
+- [x] `R-DM-05` の定義を2フィールドへ更新。
 
 ## メモ / 申し送り
 
-- ✅ `FrameData` / `DetectionResult` は **削除対象**（古い実装の残骸）と確定。上記「コード削除」タスク参照。
-- ✅ `box`/`boxes` 座標系は `xyxy` と確定。
+- ✅ `FrameData` / `DetectionResult` は **削除済み**（古い実装の残骸）。`import numpy as np` も除去。
+- ✅ `box`/`boxes` 座標系は `xyxy`（削除済みのため、xyxy は `sv.Detections` にのみ残る）。
 - ✅ レイテンシ2フィールドのデフォルト `0.0` の経緯は確定（コミット `0ded396`）。dataclass 文法制約 + 後方互換。`getattr` 防御は単一バージョン内では実質冗長。
 - ✅ `detections` は **`Any` 型を維持**で確定。ランタイム影響ゼロ・pickle 世代間不整合は同一バージョン往復のため発生しない。実リスクは supervision API 結合のみで「壊れたら追従」方針。ただし上記ガードレール2本（pickle 往復・描画スモーク）が方針成立の前提。
-- ✅ `TrackInfo.box`/`score` は **削除（detections に一本化）** で確定。`TrackInfo` は `track_id`/`class_id` の2フィールドへ縮小。
+- ✅ `TrackInfo.box`/`score` は **削除済み（detections に一本化）**。`TrackInfo` は `track_id`/`class_id` の2フィールド。
 - ✅ `queue_latency_ms` は **リネームせず docstring で定義固定** で確定（名前据え置き）。
 - 🔎 レイテンシ恒等式 `total == queue + process` が厳密成立（同一時刻基準）。`process_time_ms` のみ `getattr` 非経由で、2値が後付けである確定済み経緯を補強。

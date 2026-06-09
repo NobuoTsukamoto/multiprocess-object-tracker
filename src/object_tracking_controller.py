@@ -216,8 +216,6 @@ class ObjectTrackingController(multiprocessing.Process):
                         track_info = TrackInfo(
                             track_id=int(tracked_detections.tracker_id[i]),
                             class_id=int(tracked_detections.class_id[i]),
-                            box=tracked_detections.xyxy[i].tolist(),
-                            score=float(tracked_detections.confidence[i]),
                         )
                         track_results.append(track_info)
 

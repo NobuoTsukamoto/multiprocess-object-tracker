@@ -92,5 +92,5 @@ flowchart TD
 - `src/camera_controller.py:19-145` — `CameraController` 本体
 - `src/shared_frame_pool.py:153-201,273` — `SharedFrameAccessor`（write/shape/close）
 - `src/gui_controller.py:68,84-95,386-401` — プール/`error_queue` 生成・プロセス生成/起動
-- `src/data_models.py:56-67` — `WorkerError`（[`data-models`](../data-models/)）
+- `src/data_models.py:39-49` — `WorkerError`（[`data-models`](../data-models/)）
 - `src/config_manager.py:12-19` — `CameraConfig`（`source`/fps/width/height）
