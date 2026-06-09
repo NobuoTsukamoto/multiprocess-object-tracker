@@ -48,11 +48,11 @@
 ### 実装（✅完了）
 - [x] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`_report_error`、`object_tracking_controller.py:46-56,135`）。コンストラクタに `error_queue` 引数を追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。
 - [ ] **`_report_error` のテスト**（R-OTC-05/23）: `error_queue` スタブで ONNX ロード失敗時に `WorkerError` が put され早期 return することを検証。
-- [ ] **検出閾値の設定化**（config-manager で決定）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold` に差し替え（`object_tracking_controller.py:204-205`）。
+- [x] **検出閾値の設定化**（**実装済み**）: 生検出 confidence フィルタ→`self.det_config.detection_threshold`（`:205`）、NMS→`self.det_config.nms_iou_threshold`（`:208`）に差し替え。`config_manager`/`default.yaml`/README も同期。既定は従来同値（0.1 / 0.45）で挙動不変。
 
 ### 実装 / 改善（将来）
 - [ ] **他モデル対応**（将来）: YOLOX 固定（`p6=False`、strides `[8,16,32]`、`scores=obj×cls`）を脱し、他検出モデル/他ストライド構成に対応。今回は対象外（当面 YOLOX 固定で確定）。
-- [ ] `input_name = session.get_inputs()[0].name` をループ外へ巻き上げ（`:161`、軽微な最適化）。
+- [ ] `input_name = session.get_inputs()[0].name` をループ外へ巻き上げ（`:176`、軽微な最適化）。
 - [ ] 例外耐性: 推論中の例外（不正フレーム等）を握って継続するか、致命扱いにするかの方針明文化。
 - [ ] 型注釈の補強（`_read_frame`/`_preprocess`/`_postprocess` の戻り値型）。
 
@@ -60,7 +60,7 @@
 
 - ✅ ONNX ロード失敗は **GUI へ専用エラー通知**（R-OTC-23、**実装済み**。`error_queue` + `WorkerError`、camera R-CAM-14 / gui R-GUI-44 と同一機構・ステータス Queue に確定）。
 - ✅ 当面 **YOLOX 固定**で進める（他モデル対応は将来）。
-- 🔁 **他 spec 確定の反映**: `0.1`/`0.45` は config-manager で `detection_threshold`/`nms_iou_threshold` にキー化決定済み。本モジュールで消費差し替え。
+- ✅ 検出閾値を設定キー化（**実装済み**）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold`。消費側を `self.det_config.*` へ差し替え（既定同値で挙動不変）。
 - 🔎 `_read_frame` は `read`(2-tuple)/`read_latest`(3-tuple) を `(frame_ref, image, skipped)` に正規化（`fifo` は skip=0）。
 - 🔎 検出フィルタ順は confidence→NMS→class→area。NMS はクラス選別前に全体へ適用。
 - 🔎 空検出/`tracker_id` None でも `TrackingResult` は送出（`track_infos` 空）。

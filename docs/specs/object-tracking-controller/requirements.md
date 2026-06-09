@@ -44,33 +44,33 @@
 | R-OTC-13 | ユビキタス | システムは入力遅延（`input_lag`）・`frame_id_delta`・`skipped_count` を計測・保持すること。 | `src/object_tracking_controller.py:163-170` | — |
 | R-OTC-14 | イベント駆動 | システムはフレームを前処理（letterbox、pad 値 114、CHW 転置、float32）→ ONNX 推論 → YOLOX 後処理（strides `[8,16,32]`）すること。 | `src/object_tracking_controller.py:82-122,172-185` | — |
 | R-OTC-15 | イベント駆動 | システムは推論出力から box を xywh→xyxy 変換して `ratio` で逆スケールし、`class_id=argmax(obj×cls)`・`confidence=max(obj×cls)` で `sv.Detections` を構築すること。 | `src/object_tracking_controller.py:187-203` | — |
-| R-OTC-16 | イベント駆動 | システムは検出を confidence>0.1 → NMS(IoU 0.45) → `class_id ∈ tracking.class_id` → `area ≥ min_box_area` の順でフィルタすること。 | `src/object_tracking_controller.py:204-209` | — |
-| R-OTC-17 | イベント駆動 | システムは ByteTrack でフィルタ後の検出を追跡更新すること。 | `src/object_tracking_controller.py:211` | — |
-| R-OTC-18 | イベント駆動 | `tracker_id` が付与されているとき、システムは各追跡について `TrackInfo`（track_id/class_id を `int()` キャスト）を構築すること（box/score は削除済み）。 | `src/object_tracking_controller.py:213-220` | — |
-| R-OTC-19 | イベント駆動 | システムは `TrackingResult`（frame_id/timestamp/track_infos/detections/process_time_ms/queue_latency_ms/total_latency_ms）を構築すること。 | `src/object_tracking_controller.py:226-234` | — |
-| R-OTC-20 | 異常系 | `track_queue` への `put_nowait` が `Full` のとき、システムは最古の結果を捨てて再 put し、なお `Full` なら warning をログ（ドロップ）すること。 | `src/object_tracking_controller.py:236-248` | — |
-| R-OTC-21 | イベント駆動 | `performance_interval` フレームごとに、システムは PERFORMANCE レベルで frame/process_time/avg_fps/frame_id_delta/skipped/input_lag をログすること。 | `src/object_tracking_controller.py:250-267` | — |
-| R-OTC-22 | イベント駆動 | ループ終了時（`finally`）、システムは `frame_pool` を `close` し停止 info をログすること。 | `src/object_tracking_controller.py:268-270` | — |
+| R-OTC-16 | イベント駆動 | システムは検出を confidence>`detection.detection_threshold` → NMS(IoU=`detection.nms_iou_threshold`) → `class_id ∈ tracking.class_id` → `area ≥ min_box_area` の順でフィルタすること。 | `src/object_tracking_controller.py:204-213` | — |
+| R-OTC-17 | イベント駆動 | システムは ByteTrack でフィルタ後の検出を追跡更新すること。 | `src/object_tracking_controller.py:215` | — |
+| R-OTC-18 | イベント駆動 | `tracker_id` が付与されているとき、システムは各追跡について `TrackInfo`（track_id/class_id を `int()` キャスト）を構築すること（box/score は削除済み）。 | `src/object_tracking_controller.py:217-224` | — |
+| R-OTC-19 | イベント駆動 | システムは `TrackingResult`（frame_id/timestamp/track_infos/detections/process_time_ms/queue_latency_ms/total_latency_ms）を構築すること。 | `src/object_tracking_controller.py:230-238` | — |
+| R-OTC-20 | 異常系 | `track_queue` への `put_nowait` が `Full` のとき、システムは最古の結果を捨てて再 put し、なお `Full` なら warning をログ（ドロップ）すること。 | `src/object_tracking_controller.py:240-252` | — |
+| R-OTC-21 | イベント駆動 | `performance_interval` フレームごとに、システムは PERFORMANCE レベルで frame/process_time/avg_fps/frame_id_delta/skipped/input_lag をログすること。 | `src/object_tracking_controller.py:254-271` | — |
+| R-OTC-22 | イベント駆動 | ループ終了時（`finally`）、システムは `frame_pool` を `close` し停止 info をログすること。 | `src/object_tracking_controller.py:272-274` | — |
 | R-OTC-23 | 異常系 | ONNX ロードに失敗したとき、システムは GUI へロード失敗を `WorkerError(source="tracking", ...)` として `error_queue` に**専用エラー通知**すること（**実装済み**）。GUI 側は状態「エラー」を表示する（[`gui-controller`](../gui-controller/) R-GUI-44）。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。 | `src/object_tracking_controller.py:46-56,134-136` | — |
 
 ## 前提条件 / 不変条件
 
 - **子プロセス内アタッチ/構成**: Logger・`SharedFrameAccessor`・ONNX セッション・ByteTrack は `run()`（子プロセス）で生成する。コンストラクタには pickle 可能な spec/queue/event のみ渡る。出典 `src/object_tracking_controller.py:125,128,138,145`。
 - **`_read_frame` の戻り正規化**: `read`（2-tuple）も `read_latest`（3-tuple）も、`_read_frame` が `(frame_ref, image, skipped_count)` の3要素へ統一する（`fifo` は skip=0）。出典 `src/object_tracking_controller.py:62-80`。
-- **`frame_id` 突合**: `TrackingResult.frame_id == FrameRef.frame_id`。GUI がこの ID でカメラ画像と結合する。出典 `src/object_tracking_controller.py:227`、[`data-models`](../data-models/)。
-- **`score_threshold` の意味**: 生検出フィルタ（ハードコード `>0.1`）ではなく ByteTrack の `track_activation_threshold`。出典 `src/object_tracking_controller.py:139,204`、[`config-manager`](../config-manager/)。
+- **`frame_id` 突合**: `TrackingResult.frame_id == FrameRef.frame_id`。GUI がこの ID でカメラ画像と結合する。出典 `src/object_tracking_controller.py:231`、[`data-models`](../data-models/)。
+- **`score_threshold` の意味**: 生検出フィルタ（`detection.detection_threshold`）ではなく ByteTrack の `track_activation_threshold`。出典 `src/object_tracking_controller.py:139,205`、[`config-manager`](../config-manager/)。
 - **YOLOX 前提**: 後処理は YOLOX 出力（strides `[8,16,32]`、`p6=False`、`scores=obj×cls`）に固定。出典 `src/object_tracking_controller.py:102-122,188`。
-- **レイテンシ恒等式**: `total_latency_ms == queue_latency_ms + process_time_ms`（同一時刻基準）。出典 `src/object_tracking_controller.py:163-165,222-224`、[`data-models`](../data-models/)。
+- **レイテンシ恒等式**: `total_latency_ms == queue_latency_ms + process_time_ms`（同一時刻基準）。出典 `src/object_tracking_controller.py:163-165,226-228`、[`data-models`](../data-models/)。
 - **エラー通知は送出のみ**: `_report_error` は `error_queue` へ `WorkerError(source="tracking", ...)` を put して return するだけ。全停止判断は GUI（R-GUI-44）。`error_queue` が None でも安全。出典 `src/object_tracking_controller.py:46-56`。
 
 ## 確定事項（レビュー反映済み）
 
 - ✅ **ONNX ロード失敗は GUI へ通知（エラー扱い・実装済み、R-OTC-23）**: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`object_tracking_controller.py:46-56,134-136`）。camera-controller の R-CAM-14（open 失敗通知）と**同一の専用通知**で、GUI は状態「エラー」を表示する（[`gui-controller`](../gui-controller/) R-GUI-44）。通知機構は**ステータス Queue に確定**。
 - ✅ **当面 YOLOX 固定で進める**: `p6=False`・strides `[8,16,32]`・`scores=obj×cls` の YOLOX 前提を当面の正式スコープとする。他モデル対応は将来の拡張テーマとして tasks に残す（今回は実装しない）。
-- ✅ **検出フィルタ閾値の設定化（他 spec 確定の反映）**: confidence `>0.1`（`:204`）・NMS IoU `0.45`（`:205`）は [`config-manager`](../config-manager/) で `detection.detection_threshold`/`detection.nms_iou_threshold` へキー化決定済み。本モジュールで消費側を設定値へ差し替える（タスク化）。
+- ✅ **検出フィルタ閾値の設定化（実装済み）**: confidence フィルタ（`:205`）・NMS IoU（`:208`）を `detection.detection_threshold`（既定 0.1）/ `detection.nms_iou_threshold`（既定 0.45）へキー化し、消費側を `self.det_config.*` へ差し替え済み（[`config-manager`](../config-manager/)）。
 
 ## 未確定 / 要レビュー事項
 
 - （解消済み）GUI 通知機構の選択 → [`gui-controller`](../gui-controller/) R-GUI-44 で方針確定（専用エラー通知＋GUI 表示、**ステータス Queue 推奨**、camera/tracking 共通）。最終的な実装形（Event か Queue か）は実装時に 3 モジュール横断で確定する。
 - [ ] **`input_name` をループ内で毎回取得**: `session.get_inputs()[0].name` を反復ごとに呼ぶ（`:176`）。ループ外へ巻き上げ可能（軽微な最適化、tasks 将来改善）。
-- [ ] **空検出/`tracker_id` None の意図確認**: フィルタ後に検出ゼロ、または `tracker_id is None` のとき `track_infos` は空のまま `TrackingResult` を送出する。意図どおりか確認。出典 `src/object_tracking_controller.py:213-220`。
+- [ ] **空検出/`tracker_id` None の意図確認**: フィルタ後に検出ゼロ、または `tracker_id is None` のとき `track_infos` は空のまま `TrackingResult` を送出する。意図どおりか確認。出典 `src/object_tracking_controller.py:217-224`。

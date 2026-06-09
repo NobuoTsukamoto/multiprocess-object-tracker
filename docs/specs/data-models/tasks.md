@@ -50,7 +50,7 @@
 - [x] `docs/steering/structure.md:21` の `data_models.py` 注記を実態（`FrameRef/TrackInfo/TrackingResult/WorkerError`）へ更新。
 - [x] `R-DM-02`（FrameData）・`R-DM-04`（DetectionResult）は ID を保持しつつ「削除済み」へ更新（ID 安定のため除去せず）。
 - [x] `TrackInfo` から `box`/`score` を削除し、`track_id`/`class_id` の2フィールドへ縮小（detections に一本化）。
-- [x] 併せて生成側 `src/object_tracking_controller.py:213-220` の `box=`/`score=` を除去。
+- [x] 併せて生成側 `src/object_tracking_controller.py:217-224` の `box=`/`score=` を除去。
 - [x] `R-DM-05` の定義を2フィールドへ更新。
 
 ## メモ / 申し送り

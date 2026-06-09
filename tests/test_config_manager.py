@@ -34,6 +34,14 @@ class ConfigManagerTest(unittest.TestCase):
 
         self.assertEqual(manager.get_config("camera").source, 0)
 
+    def test_detection_threshold_keys_have_defaults(self):
+        from config_manager import DetectionConfig
+
+        detection = DetectionConfig()
+
+        self.assertEqual(detection.detection_threshold, 0.1)
+        self.assertEqual(detection.nms_iou_threshold, 0.45)
+
 
 if __name__ == "__main__":
     unittest.main()

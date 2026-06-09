@@ -96,7 +96,9 @@
 | detection | model_path | 検出モデルのパス |
 |  | providers | onnxruntimeの実行プロバイダー（例: ['CPUExecutionProvider']） |
 |  | fp16 | true: FP16モード、false: FP32モード |
-|  | score_threshold | 検出スコアの閾値 |
+|  | score_threshold | ByteTrack の追跡開始しきい値（生検出フィルタではない） |
+|  | detection_threshold | 生検出 confidence の下限フィルタ（既定 0.1） |
+|  | nms_iou_threshold | NMS の IoU しきい値（既定 0.45） |
 |  | class_names | 検出モデルのクラス名リスト（表示用） |
 | tracking | class_id | 追跡するクラスIDのリスト |
 |  | max_lost | 最大消失フレーム数 |

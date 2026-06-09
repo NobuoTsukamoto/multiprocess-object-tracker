@@ -201,8 +201,12 @@ class ObjectTrackingController(multiprocessing.Process):
                     confidence=confidences,
                     class_id=class_ids,
                 )
-                detections = detections[detections.confidence > 0.1]
-                detections = detections.with_nms(threshold=0.45)
+                detections = detections[
+                    detections.confidence > self.det_config.detection_threshold
+                ]
+                detections = detections.with_nms(
+                    threshold=self.det_config.nms_iou_threshold
+                )
 
                 mask = np.isin(detections.class_id, self.track_config.class_id)
                 detections = detections[mask]
