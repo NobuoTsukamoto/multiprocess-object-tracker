@@ -5,6 +5,7 @@ See the LICENSE file in the project root for more information.
 """
 
 import multiprocessing
+import re
 import time
 
 import cv2
@@ -48,6 +49,18 @@ class CameraController(multiprocessing.Process):
                 self.logger.error("Failed to report camera error to GUI.")
 
     @staticmethod
+    def _resolve_camera_source(source):
+        """Resolve camera.source to a cv2.VideoCapture argument (rule B).
+
+        - int          → device index as-is
+        - all-digit str → device index (int()), so "0" behaves like 0
+        - other str     → path / URL passed through (video file, RTSP, ...)
+        """
+        if isinstance(source, str) and re.fullmatch(r"[0-9]+", source):
+            return int(source)
+        return source
+
+    @staticmethod
     def _fit_to_pool(frame, expected_shape):
         """Fit a frame to the pool's expected shape.
 
@@ -70,10 +83,11 @@ class CameraController(multiprocessing.Process):
         tracking_pool = SharedFrameAccessor(self.tracking_pool_spec)
         gui_pool = SharedFrameAccessor(self.gui_pool_spec)
 
-        cap = cv2.VideoCapture(0)  # 0 はデフォルトのカメラ
+        source = self._resolve_camera_source(self.config.source)
+        cap = cv2.VideoCapture(source)
         if not cap.isOpened():
-            self.logger.error("Failed to open camera.")
-            self._report_error("カメラを開けませんでした。")
+            self.logger.error(f"Failed to open camera (source={source!r}).")
+            self._report_error(f"カメラを開けませんでした（source={source!r}）。")
             tracking_pool.close()
             gui_pool.close()
             return

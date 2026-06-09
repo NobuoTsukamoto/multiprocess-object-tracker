@@ -44,10 +44,10 @@
 - **プロセスごとの生成（fork/spawn 両対応）**: 各ワーカーは子プロセス内（`run()`）で自前の `Logger` を生成する。`set_start_method` 未指定のため起動方式はプラットフォーム既定（Windows/macOS=spawn、Linux=fork）。
   - **spawn**: 子は再 import で `loguru` がまっさら → 子での再構成が必須。
   - **fork**: 子は親の構成済み `loguru`（親のハンドラ）を継承 → 子の `remove()`→`add()` で継承状態をリセットでき安全。
-  - したがって「毎回再構成」は両方式で正しい。出典 `src/camera_controller.py:36`、`src/object_tracking_controller.py:111`、`src/main.py:32`、`src/gui_controller.py:397-398`。
+  - したがって「毎回再構成」は両方式で正しい。出典 `src/camera_controller.py:79`、`src/object_tracking_controller.py:125`、`src/main.py:32`、`src/gui_controller.py:49`。
 - **再構成は冪等（蓄積しない）**: `remove()`（全削除）→`add()`（1個）のため、同一プロセスで複数生成してもハンドラは常に1個。重複ログは起きない。出典 `src/logger.py:18-19`。
 - **`PERFORMANCE` の重大度**: `no=38` は `WARNING(30)` と `ERROR(40)` の間。レベル `INFO(20)`/`DEBUG(10)` 設定時は表示され、`ERROR(40)` 設定時は抑制される。出典 `src/logger.py:27`。
-- **`PERFORMANCE` の発火**: 実際の出力は消費側が `logger.log("PERFORMANCE", ...)` で行う（`performance_interval` フレームごと）。出典 `src/object_tracking_controller.py:238,245-253`。
+- **`PERFORMANCE` の発火**: 実際の出力は消費側が `logger.log("PERFORMANCE", ...)` で行う（`performance_interval` フレームごと）。出典 `src/object_tracking_controller.py:253,260-268`。
 - **`get_logger` は同一 singleton を返す**: インスタンス固有のロガーではなく、プロセスのグローバル `logger` を返す。出典 `src/logger.py:32-33`。
 
 ## 確定事項（レビュー反映済み）

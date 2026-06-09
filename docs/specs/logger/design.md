@@ -51,13 +51,13 @@ flowchart TD
 ```
 
 - メイン: `main.py:32` が `logging` 設定で `Logger` 生成。
-- ワーカー: `camera_controller.py:36` / `object_tracking_controller.py:111` が **子プロセス内 `run()`** で生成（spawn 対策）。
-- 出力: `info`/`warning`/`error`/`debug` は各所、`PERFORMANCE` は `object_tracking_controller.py:245-253` から `performance_interval` フレームごと。
+- ワーカー: `camera_controller.py:79` / `object_tracking_controller.py:125` が **子プロセス内 `run()`** で生成（spawn 対策）。
+- 出力: `info`/`warning`/`error`/`debug` は各所、`PERFORMANCE` は `object_tracking_controller.py:260-268` から `performance_interval` フレームごと。
 
 ## 不変条件 / 前提条件
 
 - **後勝ち再構成（蓄積しない）**: `remove()`（全削除）→`add()`（1個）のため、同一プロセスで複数 `Logger` を生成してもハンドラは常に1個で重複しない。ガードは不要。出典 `src/logger.py:18-19`。
-- **プロセス分離（fork/spawn 両対応）**: spawn では子の `loguru` がまっさら、fork では親の構成を継承。いずれも子の `remove()`→`add()` 再構成で正しく動く。「構成済みスキップ」型ガードは fork でフラグ継承により再構成を飛ばし危険なため**入れない**。出典 `src/logger.py:17-23`、`src/camera_controller.py:36`、`src/object_tracking_controller.py:111`。
+- **プロセス分離（fork/spawn 両対応）**: spawn では子の `loguru` がまっさら、fork では親の構成を継承。いずれも子の `remove()`→`add()` 再構成で正しく動く。「構成済みスキップ」型ガードは fork でフラグ継承により再構成を飛ばし危険なため**入れない**。出典 `src/logger.py:17-23`、`src/camera_controller.py:79`、`src/object_tracking_controller.py:125`。
 - **`PERFORMANCE=38`**: `WARNING(30)`〜`ERROR(40)` の間。`INFO`/`DEBUG` で可視、`ERROR` で抑制。出典 `src/logger.py:27`。
 - **冪等登録**: `logger.level("PERFORMANCE", ...)` の再呼び出しは `ValueError`。try/except で握りつぶし冪等化。出典 `src/logger.py:26-30`。
 
@@ -77,6 +77,6 @@ flowchart TD
 
 - `src/logger.py:12-33` — `Logger` 本体
 - `src/main.py:32` — メインプロセスでの生成
-- `src/camera_controller.py:36` / `src/object_tracking_controller.py:111` — ワーカーでの生成
-- `src/object_tracking_controller.py:238,245-253` — `PERFORMANCE` ログの発火
-- `src/config_manager.py:51-55` — `LoggingConfig`（level/output/performance_interval）
+- `src/camera_controller.py:79` / `src/object_tracking_controller.py:125` — ワーカーでの生成
+- `src/object_tracking_controller.py:253,260-268` — `PERFORMANCE` ログの発火
+- `src/config_manager.py:53-57` — `LoggingConfig`（level/output/performance_interval）

@@ -38,5 +38,24 @@ class FitToPoolTest(unittest.TestCase):
         self.assertIsNone(CameraController._fit_to_pool(frame, self.EXPECTED))
 
 
+class ResolveCameraSourceTest(unittest.TestCase):
+    def test_int_passes_through_as_device_index(self):
+        self.assertEqual(CameraController._resolve_camera_source(0), 0)
+        self.assertEqual(CameraController._resolve_camera_source(2), 2)
+
+    def test_digit_string_becomes_int_device_index(self):
+        self.assertEqual(CameraController._resolve_camera_source("0"), 0)
+        self.assertEqual(CameraController._resolve_camera_source("10"), 10)
+
+    def test_non_digit_string_passes_through_as_path_or_url(self):
+        self.assertEqual(
+            CameraController._resolve_camera_source("video.mp4"), "video.mp4"
+        )
+        self.assertEqual(
+            CameraController._resolve_camera_source("rtsp://host/stream"),
+            "rtsp://host/stream",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,12 +5,14 @@ See the LICENSE file in the project root for more information.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import yaml
 
 
 @dataclass
 class CameraConfig:
+    # source: int=デバイスインデックス / 数字文字列=int 化 / それ以外の文字列=パス/URL。
+    source: Union[int, str] = 0
     fps: int = 30
     width: int = 1280
     height: int = 720

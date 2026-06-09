@@ -48,7 +48,7 @@
 ### 実装（✅完了）
 - [x] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`_report_error`、`object_tracking_controller.py:46-56,135`）。コンストラクタに `error_queue` 引数を追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。
 - [ ] **`_report_error` のテスト**（R-OTC-05/23）: `error_queue` スタブで ONNX ロード失敗時に `WorkerError` が put され早期 return することを検証。
-- [ ] **検出閾値の設定化**（config-manager で決定）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold` に差し替え（`object_tracking_controller.py:189-190`）。
+- [ ] **検出閾値の設定化**（config-manager で決定）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold` に差し替え（`object_tracking_controller.py:204-205`）。
 
 ### 実装 / 改善（将来）
 - [ ] **他モデル対応**（将来）: YOLOX 固定（`p6=False`、strides `[8,16,32]`、`scores=obj×cls`）を脱し、他検出モデル/他ストライド構成に対応。今回は対象外（当面 YOLOX 固定で確定）。

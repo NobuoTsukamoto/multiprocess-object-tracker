@@ -20,7 +20,7 @@
 | R-CAM-10（ドロップ→warning） | — | ⬜ 未カバー |
 | R-CAM-11（frame_id 単調増加） | — | ⬜ 未カバー |
 | R-CAM-12（finally 後始末） | — | ⬜ 未カバー |
-| R-CAM-13a〜d（source 型解釈・ルールB） | — | ⬜ 未カバー（改修予定） |
+| R-CAM-13a〜d（source 型解釈・ルールB） | `ResolveCameraSourceTest`（int/数字文字列/パス・URL） | ✅ カバー済み（`_resolve_camera_source`、実装済み） |
 | R-CAM-14（open 失敗→GUI 通知） | — | ⬜ 未カバー（実装済み） |
 | R-CAM-15（チャンネル不一致→error+drop） | `FitToPoolTest::test_returns_none_for_grayscale_frame` / `::test_returns_none_for_four_channel_frame` | 🟡 部分（実装済み・`_fit_to_pool` のみ。run の error/continue は未） |
 
@@ -29,7 +29,7 @@
 ### 文書化 / 整合
 - [x] ✅確定: 旧「Resize/pad」コメントを実装（resize＋チャンネル不一致ドロップ）に合わせて書き換え済み（`camera_controller.py:93-97`）。
 - [ ] 解像度/FPS は「要求のみ（非保証）」である点を README へ補足。
-- [ ] `camera.source`（int/文字列対応）を README 設定表・`config/default.yaml`・config-manager spec に追記。
+- [x] `camera.source`（int/文字列対応）を README 設定表・`config/default.yaml`・config-manager spec に追記（**完了**）。
 
 ### テスト
 - [x] `tests/test_camera_controller.py` を新設。`_fit_to_pool` の resize（R-CAM-08）／チャンネル不一致 `None`（R-CAM-15）を numpy 配列で検証。
@@ -42,9 +42,9 @@
   - [ ] `frame_id` が反復ごとに +1（R-CAM-11）。
   - [ ] `stop_event` セットでループ脱出＋release/close（R-CAM-06/12）。
 
-### 実装（✅確定）
-- [ ] **カメラソースの設定キー化**（R-CAM-13a〜d、ルールB確定）: `CameraConfig` に `source`（既定 `0`、int or str）を追加。解釈ヘルパを実装（int→そのまま / `^\d+$` 文字列→`int()` / それ以外の文字列→そのまま）し `cv2.VideoCapture(resolved)` へ。`config/default.yaml`・README・config-manager spec も同期。
-- [x] **オープン失敗の GUI 通知**（R-CAM-14、**実装済み**）: `error_queue` へ `data_models.WorkerError(source="camera", ...)` を送出（`_report_error`、`camera_controller.py:38-48,76`）。コンストラクタに `error_queue` 引数追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。機構は**ステータス Queue に確定**（tracking R-OTC-23 と共通）。
+### 実装（✅完了）
+- [x] **カメラソースの設定キー化**（R-CAM-13a〜d、ルールB、**実装済み**）: `CameraConfig` に `source`（既定 `0`、`Union[int, str]`、`config_manager.py:14-15`）を追加。`_resolve_camera_source`（`camera_controller.py:51-61`）で int→そのまま / `[0-9]+` 文字列→`int()` / それ以外の文字列→そのまま と解釈し `cv2.VideoCapture(resolved)` へ（`:86-87`）。`config/default.yaml`・README・config-manager spec も同期。`ResolveCameraSourceTest` 3本を追加。
+- [x] **オープン失敗の GUI 通知**（R-CAM-14、**実装済み**）: `error_queue` へ `data_models.WorkerError(source="camera", ...)` を送出（`_report_error`、`camera_controller.py:39-49,90`）。コンストラクタに `error_queue` 引数追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。機構は**ステータス Queue に確定**（tracking R-OTC-23 と共通）。
 - [ ] **`_report_error` のテスト**（R-CAM-14）: `error_queue` スタブで open 失敗時に `WorkerError` が put され早期 return することを検証。
 - [x] **チャンネル不一致の error ドロップ**（R-CAM-15、**実装済み**）: `_fit_to_pool` が `cv2.resize` 後も shape 不一致なら `None` を返し、`run()` 側で error ログ＋`continue`（書き込みスキップ、`frame_id` 非加算）。`_fit_to_pool` の単体テスト2本を追加。
 - [ ] grab 連続失敗は無限リトライのまま（R-CAM-07、変更不要）。
@@ -55,7 +55,7 @@
 
 ## メモ / 申し送り
 
-- ✅ カメラソースは `camera.source`（キー名確定）で設定キー化。型解釈は**ルールB**（int / 数字文字列→int / それ以外→パスURL）で確定（R-CAM-13a〜d）。
+- ✅ カメラソースは `camera.source` で設定キー化（R-CAM-13a〜d、**実装済み**）。型解釈は**ルールB**（int / 数字文字列→int / それ以外→パスURL）。`_resolve_camera_source` + `ResolveCameraSourceTest`。
 - ✅ open 失敗は GUI へ専用エラー通知（R-CAM-14、**実装済み**。`error_queue` + `WorkerError`、gui R-GUI-44 と共通・ステータス Queue に確定）。
 - ✅ grab 連続失敗は無限リトライのまま（R-CAM-07、仕様確定）。
 - ✅ チャンネル不一致は error ログ＋ドロップ（R-CAM-15、**実装済み**）。`_fit_to_pool`（`None`）→ run で `continue`（`frame_id` 非加算）。

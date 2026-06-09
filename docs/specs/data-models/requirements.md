@@ -63,7 +63,7 @@
   - **方針成立の前提条件**: 「テストが通れば OK」を機能させるには、(1) `TrackingResult`（実 `sv.Detections` を含む）の pickle 往復テスト、(2) GUI 描画経路を実 `sv.Detections` で通すスモークテスト、の2本が**必須**。これが無いと supervision 上げで描画が壊れても CI がグリーンのまま通る。→ tasks.md でガードレールとしてタスク化。
 
 - ✅ **`TrackInfo.box` / `TrackInfo.score` は削除する（detections に一本化）**: 両フィールドは生成側（`src/object_tracking_controller.py:204-205`）で詰められるが `src/` のどこからも読まれていない。ボックス/スコアは `detections`（`sv.Detections`）が正とし、`TrackInfo` は `track_id`/`class_id` のみ（GUI リスト表示用、`src/gui_controller.py:534`）へ縮小する。→ コード削除をタスク化（R-DM-05 は縮小後の定義に更新予定）。
-- ✅ **`queue_latency_ms` はリネームせず docstring で定義固定**: 実体は「撮像→推論開始」の入力遅延（内部名 `last_input_lag_ms`、共有プール待ち含む。出典 `src/object_tracking_controller.py:150,219`）。フィールド名は据え置き、`TrackingResult` の docstring に定義を明記して曖昧さを解消する。→ docstring 追記をタスク化。
+- ✅ **`queue_latency_ms` はリネームせず docstring で定義固定**: 実体は「撮像→推論開始」の入力遅延（内部名 `last_input_lag_ms`、共有プール待ち含む。出典 `src/object_tracking_controller.py:165,234`）。フィールド名は据え置き、`TrackingResult` の docstring に定義を明記して曖昧さを解消する。→ docstring 追記をタスク化。
 
 ## 未確定 / 要レビュー事項
 

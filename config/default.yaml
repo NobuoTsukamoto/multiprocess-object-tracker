@@ -1,4 +1,5 @@
 camera:
+  source: 0 # int=デバイス番号 / 数字文字列="0"等もデバイス / それ以外=動画パス・RTSP URL
   fps: 15
   width: 1280
   height: 720
