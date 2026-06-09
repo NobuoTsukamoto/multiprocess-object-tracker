@@ -42,6 +42,16 @@ class ConfigManagerTest(unittest.TestCase):
         self.assertEqual(detection.detection_threshold, 0.1)
         self.assertEqual(detection.nms_iou_threshold, 0.45)
 
+    def test_removed_keys_are_rejected(self):
+        # detection.fp16 / tracking.max_track_num are deleted from the schema;
+        # passing them must fail loudly (unknown keys raise TypeError, R-CM-07).
+        from config_manager import DetectionConfig, TrackingConfig
+
+        with self.assertRaises(TypeError):
+            DetectionConfig(fp16=False)
+        with self.assertRaises(TypeError):
+            TrackingConfig(max_track_num=10)
+
 
 if __name__ == "__main__":
     unittest.main()

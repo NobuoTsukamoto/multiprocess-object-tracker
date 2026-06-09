@@ -23,7 +23,6 @@ class CameraConfig:
 class DetectionConfig:
     model_path: str = "models/yolox_s.onnx"
     providers: List[str] = field(default_factory=lambda: ["CPUExecutionProvider"])
-    fp16: bool = False
     score_threshold: float = 0.5  # ByteTrack の track_activation_threshold（検出フィルタではない）
     detection_threshold: float = 0.1  # 生検出 confidence の下限フィルタ
     nms_iou_threshold: float = 0.45  # NMS の IoU しきい値
@@ -36,7 +35,6 @@ class TrackingConfig:
     max_lost: int = 30
     min_box_area: int = 100
     iou_threshold: float = 0.5
-    max_track_num: int = 10
     frame_read_policy: str = "bounded_latest"
     max_frame_skip: int = 2
 

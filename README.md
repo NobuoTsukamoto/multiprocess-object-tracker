@@ -95,7 +95,6 @@
 |  | max_queue_length | カメラのキューの最大数 |
 | detection | model_path | 検出モデルのパス |
 |  | providers | onnxruntimeの実行プロバイダー（例: ['CPUExecutionProvider']） |
-|  | fp16 | true: FP16モード、false: FP32モード |
 |  | score_threshold | ByteTrack の追跡開始しきい値（生検出フィルタではない） |
 |  | detection_threshold | 生検出 confidence の下限フィルタ（既定 0.1） |
 |  | nms_iou_threshold | NMS の IoU しきい値（既定 0.45） |
@@ -104,7 +103,6 @@
 |  | max_lost | 最大消失フレーム数 |
 |  | min_box_area | 追跡対象とする最小バウンディングボックス面積 |
 |  | iou_threshold | 検出と追跡の紐付けIoU閾値 |
-|  | max_track_num | 同時追跡する最大数 |
 | gui | window_width | ウィンドウの幅 |
 |  | window_height | ウィンドウの高さ |
 |  | window_x | ウィンドウ表示位置（X座標） |

@@ -28,21 +28,22 @@
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-CM-01 | ユビキタス | システムは設定スキーマを5つの `@dataclass`（`CameraConfig`/`DetectionConfig`/`TrackingConfig`/`GuiConfig`/`LoggingConfig`）と、それらを束ねる `AppConfig` で定義すること。 | `src/config_manager.py:12-68` | — |
-| R-CM-02 | ユビキタス | システムは全設定フィールドにデフォルト値を持たせ、`list` 型は `field(default_factory=...)` で定義すること（未指定時に既定値で動作）。 | `src/config_manager.py:15-59,25,30,35` | — |
-| R-CM-03 | イベント駆動 | `ConfigManager(config_path)` が生成されたとき、システムは当該 YAML を `yaml.safe_load` で読み、`AppConfig` を構築して保持すること。 | `src/config_manager.py:79-87` | `tests/test_config_manager.py::ConfigManagerTest::test_loads_default_yaml` |
-| R-CM-04 | イベント駆動 | あるセクションが設定辞書に存在しないとき、システムは空 dict を渡して当該セクションを全デフォルト値で構築すること。 | `src/config_manager.py:89-96`（`.get(section, {})`） | — |
-| R-CM-05 | イベント駆動 | `get_config(name)` が呼ばれたとき、システムは `AppConfig` の属性 `name` に対応する設定オブジェクトを返すこと。 | `src/config_manager.py:98-99` | — |
-| R-CM-06 | 異常系 | `config_path` のファイルが存在しないとき、システムは `FileNotFoundError` を送出すること。 | `src/config_manager.py:83`（`open`）、`src/main.py:38-40` | `tests/test_config_manager.py::ConfigManagerTest::test_missing_file_raises_file_not_found` |
-| R-CM-07 | 異常系 | あるセクションに dataclass 未定義のキーが含まれるとき、システムは dataclass コンストラクタの `TypeError`（unexpected keyword argument）を送出すること（未知キーを無視しない）。 | `src/config_manager.py:89-96`（`**` 展開の帰結） | — |
-| R-CM-08 | 異常系 | `get_config(name)` の `name` が `AppConfig` に存在しないとき、システムは `getattr` 由来の `AttributeError` を送出すること。 | `src/config_manager.py:99` | — |
-| R-CM-09 | 異常系 | 設定ファイルが空で `yaml.safe_load` が `None` を返すとき、システムは専用例外 `EmptyConfigError`（メッセージにパスを含む）を送出すること（**実装済み**）。`main.py` は `FileNotFoundError` と同様に専用ハンドラで捕捉し stderr 出力＋`exit(1)` する。 | `src/config_manager.py:71-72,85-86`、`src/main.py:41-43` | `tests/test_config_manager.py::ConfigManagerTest::test_empty_file_raises_empty_config_error` |
-| R-CM-10 | ユビキタス | システムは設定値の**型検証・値域検証を行わず**、YAML が与えた値をそのまま dataclass に格納すること（型注釈は強制されない）。 | `src/config_manager.py:89-96` | — |
-| R-CM-11 | ユビキタス | システムは設定ファイルを **UTF-8** で読み込むこと（プラットフォーム既定エンコーディング、例: 日本語 Windows の cp932 に依存しない）。 | `src/config_manager.py:80-83` | — |
+| R-CM-01 | ユビキタス | システムは設定スキーマを5つの `@dataclass`（`CameraConfig`/`DetectionConfig`/`TrackingConfig`/`GuiConfig`/`LoggingConfig`）と、それらを束ねる `AppConfig` で定義すること。 | `src/config_manager.py:12-66` | — |
+| R-CM-02 | ユビキタス | システムは全設定フィールドにデフォルト値を持たせ、`list` 型は `field(default_factory=...)` で定義すること（未指定時に既定値で動作）。 | `src/config_manager.py:15-57,25,29,34` | — |
+| R-CM-03 | イベント駆動 | `ConfigManager(config_path)` が生成されたとき、システムは当該 YAML を `yaml.safe_load` で読み、`AppConfig` を構築して保持すること。 | `src/config_manager.py:77-85` | `tests/test_config_manager.py::ConfigManagerTest::test_loads_default_yaml` |
+| R-CM-04 | イベント駆動 | あるセクションが設定辞書に存在しないとき、システムは空 dict を渡して当該セクションを全デフォルト値で構築すること。 | `src/config_manager.py:87-94`（`.get(section, {})`） | — |
+| R-CM-05 | イベント駆動 | `get_config(name)` が呼ばれたとき、システムは `AppConfig` の属性 `name` に対応する設定オブジェクトを返すこと。 | `src/config_manager.py:96-97` | — |
+| R-CM-06 | 異常系 | `config_path` のファイルが存在しないとき、システムは `FileNotFoundError` を送出すること。 | `src/config_manager.py:81`（`open`）、`src/main.py:38-40` | `tests/test_config_manager.py::ConfigManagerTest::test_missing_file_raises_file_not_found` |
+| R-CM-07 | 異常系 | あるセクションに dataclass 未定義のキーが含まれるとき、システムは dataclass コンストラクタの `TypeError`（unexpected keyword argument）を送出すること（未知キーを無視しない）。 | `src/config_manager.py:87-94`（`**` 展開の帰結） | `tests/test_config_manager.py::ConfigManagerTest::test_removed_keys_are_rejected`（削除キーで確認） |
+| R-CM-08 | 異常系 | `get_config(name)` の `name` が `AppConfig` に存在しないとき、システムは `getattr` 由来の `AttributeError` を送出すること。 | `src/config_manager.py:97` | — |
+| R-CM-09 | 異常系 | 設定ファイルが空で `yaml.safe_load` が `None` を返すとき、システムは専用例外 `EmptyConfigError`（メッセージにパスを含む）を送出すること（**実装済み**）。`main.py` は `FileNotFoundError` と同様に専用ハンドラで捕捉し stderr 出力＋`exit(1)` する。 | `src/config_manager.py:69-70,83-84`、`src/main.py:41-43` | `tests/test_config_manager.py::ConfigManagerTest::test_empty_file_raises_empty_config_error` |
+| R-CM-10 | ユビキタス | システムは設定値の**型検証・値域検証を行わず**、YAML が与えた値をそのまま dataclass に格納すること（型注釈は強制されない）。 | `src/config_manager.py:87-94` | — |
+| R-CM-11 | ユビキタス | システムは設定ファイルを **UTF-8** で読み込むこと（プラットフォーム既定エンコーディング、例: 日本語 Windows の cp932 に依存しない）。 | `src/config_manager.py:78-81` | — |
+| R-CM-12 | ユビキタス | システムは `src/` のどこからも消費されない設定キーをスキーマに持たないこと（`detection.fp16` / `tracking.max_track_num` は削除済み。指定すると R-CM-07 により `TypeError`）。 | `src/config_manager.py:22-39` | `tests/test_config_manager.py::ConfigManagerTest::test_removed_keys_are_rejected` |
 
 ## 設定キー一覧（スキーマ ↔ 消費側の対応）
 
-> 全キーの「定義（既定値）」と「消費側 `file:line`」。**未消費キー**は ❌ で示す。
+> 全キーの「定義（既定値）」と「消費側 `file:line`」。未消費キーは存在しない（R-CM-12。`detection.fp16` / `tracking.max_track_num` は削除済み）。
 
 | セクション.キー | 既定値 | 消費側出典 | 状態 |
 |:--|:--|:--|:--|
@@ -53,7 +54,6 @@
 | camera.max_queue_length | 10 | `gui_controller.py:64` | ✅ |
 | detection.model_path | models/yolox_s.onnx | `object_tracking_controller.py:129` | ✅ |
 | detection.providers | ["CPUExecutionProvider"] | `object_tracking_controller.py:129` | ✅ |
-| detection.fp16 | False | — | 🗑️ **削除対象**（FP16 はモデル側で対応） |
 | detection.score_threshold | 0.5 | `object_tracking_controller.py:139`（ByteTrack の `track_activation_threshold`） | ✅ ※後述 |
 | detection.class_names | [] | `gui_controller.py:576,647` | ✅ |
 | detection.detection_threshold | 0.1 | `object_tracking_controller.py:205` | ✅（設定キー化済み） |
@@ -62,7 +62,6 @@
 | tracking.max_lost | 30 | `object_tracking_controller.py:140` | ✅ |
 | tracking.min_box_area | 100 | `object_tracking_controller.py:213` | ✅ |
 | tracking.iou_threshold | 0.5 | `object_tracking_controller.py:141` | ✅ |
-| tracking.max_track_num | 10 | — | 🗑️ **削除対象**（未消費） |
 | tracking.frame_read_policy | bounded_latest | `object_tracking_controller.py:60` | ✅ |
 | tracking.max_frame_skip | 2 | `object_tracking_controller.py:70,79` | ✅ |
 | gui.window_width/height/x/y | 1600/900/100/100 | `gui_controller.py:57-58` | ✅ |
@@ -74,8 +73,8 @@
 
 ## 前提条件 / 不変条件
 
-- **デフォルトで完全動作**: すべてのフィールドにデフォルトがあるため、空セクション（または欠落セクション）でも当該設定は構築できる。全セクション欠落でも `config_dict` が `{}` なら `AppConfig` は全デフォルトで成立する。**ただしファイルが完全に空（`None`）の場合は別扱い**（R-CM-09、`EmptyConfigError`）。出典 `src/config_manager.py:15-59,85-96`。
-- **未知キーは拒否**: `**config_dict.get(section, {})` 展開のため、未定義キーは黙殺されず `TypeError` になる（タイプミス検出に寄与）。出典 `src/config_manager.py:89-96`。
+- **デフォルトで完全動作**: すべてのフィールドにデフォルトがあるため、空セクション（または欠落セクション）でも当該設定は構築できる。全セクション欠落でも `config_dict` が `{}` なら `AppConfig` は全デフォルトで成立する。**ただしファイルが完全に空（`None`）の場合は別扱い**（R-CM-09、`EmptyConfigError`）。出典 `src/config_manager.py:15-57,83-94`。
+- **未知キーは拒否**: `**config_dict.get(section, {})` 展開のため、未定義キーは黙殺されず `TypeError` になる（タイプミス検出に寄与）。出典 `src/config_manager.py:87-94`。
 - **検証は消費側**: 値の妥当性（例: `frame_read_policy` が `fifo`/`latest`/`bounded_latest` のいずれか）は ConfigManager では検証せず、消費側が `getattr` 既定やフォールバックで吸収する。出典 `src/object_tracking_controller.py:58-80`。
 - **`score_threshold` の意味**: 生検出のスコアフィルタ（`detection.detection_threshold`、`object_tracking_controller.py:205`）ではなく、ByteTrack の `track_activation_threshold` として使われる。出典 `src/object_tracking_controller.py:139`。
 - **3つのしきい値は別物**: `detection.detection_threshold`（生検出 confidence フィルタ、`:205`）/ `detection.nms_iou_threshold`（NMS IoU、`:208`）/ `detection.score_threshold`（ByteTrack 活性化、`:139`）/ `tracking.iou_threshold`（ByteTrack マッチング、`:141`）はそれぞれ用途が異なる。出典 `src/object_tracking_controller.py:139,141,205,208`、[`object-tracking-controller`](../object-tracking-controller/)。
@@ -83,12 +82,12 @@
 
 ## 確定事項（レビュー反映済み）
 
-- ✅ **`detection.fp16` は削除**: FP16 推論は ONNX モデル自体を FP16 で作成して対応する方針のため、設定キーは不要。スキーマ（`config_manager.py:26`）・`default.yaml:11`・README（`README.md:98`）から除去する。削除タスクは tasks.md「コード削除」。
-- ✅ **`tracking.max_track_num` は削除**: スキーマ（`config_manager.py:39`）・`default.yaml:30`・README（`README.md:107`）から除去する。ByteTrack に同時追跡上限を渡す実装は無く、用途が無い。削除タスクは tasks.md「コード削除」。
-- ✅ **NMS 関連を設定キー化（実装済み）**: 生検出フィルタ閾値 `0.1` と NMS IoU `0.45` を `DetectionConfig` の **`detection.detection_threshold`**（既定 0.1、`config_manager.py:28`）/ **`detection.nms_iou_threshold`**（既定 0.45、`:29`）へ昇格。消費側を設定値へ差し替え済み（`object_tracking_controller.py:205,208`）。既存 `score_threshold`（ByteTrack 活性化）・`tracking.iou_threshold`（ByteTrack マッチング）とは別物。`default.yaml`・README も同期済み。
+- ✅ **`detection.fp16` は削除（実装済み）**: FP16 推論は ONNX モデル自体を FP16 で作成して対応する方針のため、設定キーは不要。スキーマ・`default.yaml`・README 設定表から除去済み（R-CM-12）。回帰テスト `ConfigManagerTest::test_removed_keys_are_rejected`。
+- ✅ **`tracking.max_track_num` は削除（実装済み）**: ByteTrack に同時追跡上限を渡す実装は無く、用途が無い。スキーマ・`default.yaml`・README 設定表から除去済み（R-CM-12）。回帰テスト `ConfigManagerTest::test_removed_keys_are_rejected`。
+- ✅ **NMS 関連を設定キー化（実装済み）**: 生検出フィルタ閾値 `0.1` と NMS IoU `0.45` を `DetectionConfig` の **`detection.detection_threshold`**（既定 0.1、`config_manager.py:27`）/ **`detection.nms_iou_threshold`**（既定 0.45、`:28`）へ昇格。消費側を設定値へ差し替え済み（`object_tracking_controller.py:205,208`）。既存 `score_threshold`（ByteTrack 活性化）・`tracking.iou_threshold`（ByteTrack マッチング）とは別物。`default.yaml`・README も同期済み。
 - ✅ **`camera.source` を追加（実装済み）**: `CameraConfig` に `source: Union[int, str] = 0` を追加（`config_manager.py:14-15`）。`default.yaml`・README 設定表も同期済み。型解釈（ルール B）は消費側 `CameraController._resolve_camera_source` が担う（camera-controller R-CAM-13a〜d）。
-- ✅ **空ファイル時は専用例外で明示的検証（実装済み）**: `_load_config` で `config_dict is None` を検出し、**専用例外 `EmptyConfigError`**（`ValueError` サブクラス、メッセージにパスを含む）を送出する（R-CM-09、`config_manager.py:71-72,85-86`）。`main.py` は `FileNotFoundError` と同様の専用ハンドラで捕捉し stderr 出力＋`exit(1)`（`main.py:41-43`）。
-- ✅ **設定ファイルは UTF-8 で読む（実装済み）**: `open(..., encoding="utf-8")` で読み込み、日本語 Windows（cp932）等のプラットフォーム既定エンコーディングに依存しない（R-CM-11、`config_manager.py:80-83`）。`default.yaml` の非 ASCII コメント等が原因の `UnicodeDecodeError` を防ぐ。
+- ✅ **空ファイル時は専用例外で明示的検証（実装済み）**: `_load_config` で `config_dict is None` を検出し、**専用例外 `EmptyConfigError`**（`ValueError` サブクラス、メッセージにパスを含む）を送出する（R-CM-09、`config_manager.py:69-70,83-84`）。`main.py` は `FileNotFoundError` と同様の専用ハンドラで捕捉し stderr 出力＋`exit(1)`（`main.py:41-43`）。
+- ✅ **設定ファイルは UTF-8 で読む（実装済み）**: `open(..., encoding="utf-8")` で読み込み、日本語 Windows（cp932）等のプラットフォーム既定エンコーディングに依存しない（R-CM-11、`config_manager.py:78-81`）。`default.yaml` の非 ASCII コメント等が原因の `UnicodeDecodeError` を防ぐ。
 
 ## 未確定 / 要レビュー事項
 

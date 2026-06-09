@@ -79,4 +79,4 @@ flowchart TD
 - `src/main.py:32` — メインプロセスでの生成
 - `src/camera_controller.py:79` / `src/object_tracking_controller.py:125` — ワーカーでの生成
 - `src/object_tracking_controller.py:253,260-268` — `PERFORMANCE` ログの発火
-- `src/config_manager.py:55-59` — `LoggingConfig`（level/output/performance_interval）
+- `src/config_manager.py:53-57` — `LoggingConfig`（level/output/performance_interval）
