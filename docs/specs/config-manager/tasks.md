@@ -4,21 +4,21 @@
 
 ## テストカバレッジ状況（逆生成時）
 
-[`tests/test_config_manager.py`](../../../tests/test_config_manager.py) が空ファイル（R-CM-09）・ファイル無し（R-CM-06）・default.yaml 正常読込（R-CM-03 一部）をカバーする。残りは未カバー。
+[`tests/test_config_manager.py`](../../../tests/test_config_manager.py) が正常系（R-CM-03/04/05）と異常系（R-CM-06〜09/11/12）をカバーする。
 
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
 | R-CM-01（スキーマ定義） | — | ⬜ 未カバー |
-| R-CM-02（デフォルト完備） | — | ⬜ 未カバー |
+| R-CM-02（デフォルト完備） | `ConfigManagerTest::test_missing_sections_built_with_defaults`（間接） | 🟡 部分 |
 | R-CM-03（YAML 読込→AppConfig） | `ConfigManagerTest::test_loads_default_yaml` | 🟡 部分（default.yaml 読込のみ） |
-| R-CM-04（欠落セクション→デフォルト） | — | ⬜ 未カバー |
-| R-CM-05（get_config 取得） | — | ⬜ 未カバー |
+| R-CM-04（欠落セクション→デフォルト） | `ConfigManagerTest::test_missing_sections_built_with_defaults` | ✅ カバー済み |
+| R-CM-05（get_config 取得） | `ConfigManagerTest::test_get_config_returns_section_dataclass` | ✅ カバー済み |
 | R-CM-06（ファイル無し→FileNotFoundError） | `ConfigManagerTest::test_missing_file_raises_file_not_found` | ✅ カバー済み |
-| R-CM-07（未知キー→TypeError） | — | ⬜ 未カバー |
-| R-CM-08（不明セクション→AttributeError） | — | ⬜ 未カバー |
+| R-CM-07（未知キー→TypeError） | `ConfigManagerTest::test_unknown_key_raises_type_error`、`::test_removed_keys_are_rejected` | ✅ カバー済み |
+| R-CM-08（不明セクション→AttributeError） | `ConfigManagerTest::test_unknown_section_name_raises_attribute_error` | ✅ カバー済み |
 | R-CM-09（空ファイル→EmptyConfigError） | `ConfigManagerTest::test_empty_file_raises_empty_config_error` | ✅ カバー済み（実装済み） |
 | R-CM-10（無検証で格納） | — | ⬜ 未カバー |
-| R-CM-11（UTF-8 読み込み） | — | ⬜ 未カバー（実装済み） |
+| R-CM-11（UTF-8 読み込み） | `ConfigManagerTest::test_non_utf8_file_raises_unicode_decode_error` | ✅ カバー済み（実装済み） |
 | R-CM-12（未消費キーを持たない） | `ConfigManagerTest::test_removed_keys_are_rejected` | ✅ カバー済み（実装済み） |
 
 ## タスク
@@ -30,12 +30,12 @@
 
 ### テスト
 - [x] `tests/test_config_manager.py` を新設。空ファイル→`EmptyConfigError`（R-CM-09）、ファイル無し→`FileNotFoundError`（R-CM-06）、default.yaml 正常読込（R-CM-03）をカバー。
-- [ ] 残りのケースを追加。
-  - [ ] 欠落セクションが全デフォルトで構築されること（R-CM-04）。
-  - [ ] `get_config(section)` が対応 dataclass を返すこと（R-CM-05）。
-  - [ ] 未知キーで `TypeError`（R-CM-07）。
-  - [ ] 不明セクションで `AttributeError`（R-CM-08）。
-  - [ ] 非 UTF-8 バイト列で `UnicodeDecodeError`（R-CM-11）。
+- [x] 残りのケースを追加。
+  - [x] 欠落セクションが全デフォルトで構築されること（R-CM-04、`test_missing_sections_built_with_defaults`）。
+  - [x] `get_config(section)` が対応 dataclass を返すこと（R-CM-05、`test_get_config_returns_section_dataclass`）。
+  - [x] 未知キーで `TypeError`（R-CM-07、`test_unknown_key_raises_type_error`）。
+  - [x] 不明セクションで `AttributeError`（R-CM-08、`test_unknown_section_name_raises_attribute_error`）。
+  - [x] 非 UTF-8 バイト列で `UnicodeDecodeError`（R-CM-11、`test_non_utf8_file_raises_unicode_decode_error`）。
 
 ### コード削除（✅完了: fp16 と max_track_num を削除、R-CM-12）
 - [x] `src/config_manager.py` の `fp16` を削除（FP16 はモデル側で対応）。
@@ -67,4 +67,4 @@
 - 🆕 **整合**: README 設定表が default.yaml/コードと不一致（frame_read_policy/max_frame_skip/frame_buffer_seconds 欠落）。
 - 🔎 **検証の非対称性**: 「未知キー＝厳格（TypeError）」だが「不正値＝無検証」。値の妥当性は消費側依存。
 - 🔎 `score_threshold` は生検出フィルタではなく ByteTrack の活性化閾値。生フィルタ閾値 `0.1` は別途ハードコード。
-- 専用テストが皆無のため、まず正常系（R-CM-04/05）と異常系（R-CM-06〜09）の最小スイートを整備するのが優先。
+- ✅ 正常系（R-CM-03/04/05）と異常系（R-CM-06〜09/11/12）の最小スイートを整備済み（`tests/test_config_manager.py`、10 テスト）。残りはスキーマ定義そのもの（R-CM-01）と無検証格納（R-CM-10）のみ。

@@ -34,6 +34,68 @@ class ConfigManagerTest(unittest.TestCase):
 
         self.assertEqual(manager.get_config("camera").source, 0)
 
+    def test_missing_sections_built_with_defaults(self):
+        # R-CM-04: sections absent from the YAML are constructed entirely
+        # from dataclass defaults; present sections keep their values.
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write("camera:\n  fps: 5\n")
+            path = f.name
+        try:
+            manager = ConfigManager(path)
+            self.assertEqual(manager.get_config("camera").fps, 5)
+            self.assertEqual(manager.get_config("tracking").max_lost, 30)
+            self.assertEqual(manager.get_config("logging").level, "INFO")
+        finally:
+            Path(path).unlink()
+
+    def test_get_config_returns_section_dataclass(self):
+        # R-CM-05: get_config(name) returns the dataclass for that section.
+        from config_manager import CameraConfig, GuiConfig
+
+        default_path = (
+            Path(__file__).resolve().parents[1] / "config" / "default.yaml"
+        )
+
+        manager = ConfigManager(str(default_path))
+
+        self.assertIsInstance(manager.get_config("camera"), CameraConfig)
+        self.assertIsInstance(manager.get_config("gui"), GuiConfig)
+
+    def test_unknown_key_raises_type_error(self):
+        # R-CM-07: keys not defined on the section dataclass are rejected
+        # via the ** expansion (unexpected keyword argument).
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write("camera:\n  no_such_key: 1\n")
+            path = f.name
+        try:
+            with self.assertRaises(TypeError):
+                ConfigManager(path)
+        finally:
+            Path(path).unlink()
+
+    def test_unknown_section_name_raises_attribute_error(self):
+        # R-CM-08: get_config with a name not on AppConfig raises via getattr.
+        default_path = (
+            Path(__file__).resolve().parents[1] / "config" / "default.yaml"
+        )
+
+        manager = ConfigManager(str(default_path))
+
+        with self.assertRaises(AttributeError):
+            manager.get_config("no_such_section")
+
+    def test_non_utf8_file_raises_unicode_decode_error(self):
+        # R-CM-11: the file is read as UTF-8 regardless of the platform
+        # default encoding, so cp932-encoded content fails loudly.
+        with tempfile.NamedTemporaryFile("wb", suffix=".yaml", delete=False) as f:
+            f.write("logging:\n  level: INFO  # コメント\n".encode("cp932"))
+            path = f.name
+        try:
+            with self.assertRaises(UnicodeDecodeError):
+                ConfigManager(path)
+        finally:
+            Path(path).unlink()
+
     def test_detection_threshold_keys_have_defaults(self):
         from config_manager import DetectionConfig
 

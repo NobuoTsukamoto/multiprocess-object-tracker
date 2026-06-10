@@ -31,14 +31,14 @@
 | R-CM-01 | ユビキタス | システムは設定スキーマを5つの `@dataclass`（`CameraConfig`/`DetectionConfig`/`TrackingConfig`/`GuiConfig`/`LoggingConfig`）と、それらを束ねる `AppConfig` で定義すること。 | `src/config_manager.py:12-66` | — |
 | R-CM-02 | ユビキタス | システムは全設定フィールドにデフォルト値を持たせ、`list` 型は `field(default_factory=...)` で定義すること（未指定時に既定値で動作）。 | `src/config_manager.py:15-57,25,29,34` | — |
 | R-CM-03 | イベント駆動 | `ConfigManager(config_path)` が生成されたとき、システムは当該 YAML を `yaml.safe_load` で読み、`AppConfig` を構築して保持すること。 | `src/config_manager.py:77-85` | `tests/test_config_manager.py::ConfigManagerTest::test_loads_default_yaml` |
-| R-CM-04 | イベント駆動 | あるセクションが設定辞書に存在しないとき、システムは空 dict を渡して当該セクションを全デフォルト値で構築すること。 | `src/config_manager.py:87-94`（`.get(section, {})`） | — |
-| R-CM-05 | イベント駆動 | `get_config(name)` が呼ばれたとき、システムは `AppConfig` の属性 `name` に対応する設定オブジェクトを返すこと。 | `src/config_manager.py:96-97` | — |
+| R-CM-04 | イベント駆動 | あるセクションが設定辞書に存在しないとき、システムは空 dict を渡して当該セクションを全デフォルト値で構築すること。 | `src/config_manager.py:87-94`（`.get(section, {})`） | `tests/test_config_manager.py::ConfigManagerTest::test_missing_sections_built_with_defaults` |
+| R-CM-05 | イベント駆動 | `get_config(name)` が呼ばれたとき、システムは `AppConfig` の属性 `name` に対応する設定オブジェクトを返すこと。 | `src/config_manager.py:96-97` | `tests/test_config_manager.py::ConfigManagerTest::test_get_config_returns_section_dataclass` |
 | R-CM-06 | 異常系 | `config_path` のファイルが存在しないとき、システムは `FileNotFoundError` を送出すること。 | `src/config_manager.py:81`（`open`）、`src/main.py:38-40` | `tests/test_config_manager.py::ConfigManagerTest::test_missing_file_raises_file_not_found` |
-| R-CM-07 | 異常系 | あるセクションに dataclass 未定義のキーが含まれるとき、システムは dataclass コンストラクタの `TypeError`（unexpected keyword argument）を送出すること（未知キーを無視しない）。 | `src/config_manager.py:87-94`（`**` 展開の帰結） | `tests/test_config_manager.py::ConfigManagerTest::test_removed_keys_are_rejected`（削除キーで確認） |
-| R-CM-08 | 異常系 | `get_config(name)` の `name` が `AppConfig` に存在しないとき、システムは `getattr` 由来の `AttributeError` を送出すること。 | `src/config_manager.py:97` | — |
+| R-CM-07 | 異常系 | あるセクションに dataclass 未定義のキーが含まれるとき、システムは dataclass コンストラクタの `TypeError`（unexpected keyword argument）を送出すること（未知キーを無視しない）。 | `src/config_manager.py:87-94`（`**` 展開の帰結） | `tests/test_config_manager.py::ConfigManagerTest::test_unknown_key_raises_type_error`、`::test_removed_keys_are_rejected` |
+| R-CM-08 | 異常系 | `get_config(name)` の `name` が `AppConfig` に存在しないとき、システムは `getattr` 由来の `AttributeError` を送出すること。 | `src/config_manager.py:97` | `tests/test_config_manager.py::ConfigManagerTest::test_unknown_section_name_raises_attribute_error` |
 | R-CM-09 | 異常系 | 設定ファイルが空で `yaml.safe_load` が `None` を返すとき、システムは専用例外 `EmptyConfigError`（メッセージにパスを含む）を送出すること（**実装済み**）。`main.py` は `FileNotFoundError` と同様に専用ハンドラで捕捉し stderr 出力＋`exit(1)` する。 | `src/config_manager.py:69-70,83-84`、`src/main.py:41-43` | `tests/test_config_manager.py::ConfigManagerTest::test_empty_file_raises_empty_config_error` |
 | R-CM-10 | ユビキタス | システムは設定値の**型検証・値域検証を行わず**、YAML が与えた値をそのまま dataclass に格納すること（型注釈は強制されない）。 | `src/config_manager.py:87-94` | — |
-| R-CM-11 | ユビキタス | システムは設定ファイルを **UTF-8** で読み込むこと（プラットフォーム既定エンコーディング、例: 日本語 Windows の cp932 に依存しない）。 | `src/config_manager.py:78-81` | — |
+| R-CM-11 | ユビキタス | システムは設定ファイルを **UTF-8** で読み込むこと（プラットフォーム既定エンコーディング、例: 日本語 Windows の cp932 に依存しない）。 | `src/config_manager.py:78-81` | `tests/test_config_manager.py::ConfigManagerTest::test_non_utf8_file_raises_unicode_decode_error` |
 | R-CM-12 | ユビキタス | システムは `src/` のどこからも消費されない設定キーをスキーマに持たないこと（`detection.fp16` / `tracking.max_track_num` は削除済み。指定すると R-CM-07 により `TypeError`）。 | `src/config_manager.py:22-39` | `tests/test_config_manager.py::ConfigManagerTest::test_removed_keys_are_rejected` |
 
 ## 設定キー一覧（スキーマ ↔ 消費側の対応）
