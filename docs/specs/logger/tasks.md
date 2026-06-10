@@ -22,7 +22,7 @@
 ## タスク
 
 ### 文書化 / 整合
-- [ ] **README の output 記述を実態へ同期**（`README.md:112`）: 「console固定」→ console もしくは任意のファイルパスを指定可、と修正（またはコードを console 固定に寄せる方針なら別途判断）。
+- [x] **README の output 記述を実態へ同期**: 「console固定」→「console=標準出力。それ以外の文字列はファイルパスとして出力」に修正（ファイル出力を公式機能として記載、R-LOG-03）。
 - [ ] `PERFORMANCE`（`no=38`）の重大度（WARNING〜ERROR の間、INFO/DEBUG で可視）を README ロギング節（`README.md:72-82`）に明記。
 - [ ] 「1プロセス1 Logger」前提（グローバル singleton 再構成）を design に基づき README/steering へ補足。
 

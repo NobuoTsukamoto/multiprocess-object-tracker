@@ -32,8 +32,8 @@
 ## タスク
 
 ### 文書化 / 整合
-- [ ] `score_threshold` が ByteTrack 活性化閾値（生検出フィルタは別の `0.1`）である点を README に注記（config-manager spec と共通）。
-- [ ] 読み出しポリシー（`fifo`/`latest`/`bounded_latest`）と `max_frame_skip` の挙動を README に明記。
+- [x] `score_threshold` が ByteTrack 活性化閾値（生検出フィルタではない）である点を README 設定表に注記済み（config-manager spec と共通）。
+- [x] 読み出しポリシー（`fifo`/`latest`/`bounded_latest`）と `max_frame_skip` の挙動（不正値フォールバック含む）を README 設定表に明記。
 - [ ] YOLOX 前提（`p6=False`、strides `[8,16,32]`）を README/設計に明記。
 
 ### テスト

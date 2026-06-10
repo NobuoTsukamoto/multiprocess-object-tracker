@@ -103,14 +103,17 @@
 |  | max_lost | 最大消失フレーム数 |
 |  | min_box_area | 追跡対象とする最小バウンディングボックス面積 |
 |  | iou_threshold | 検出と追跡の紐付けIoU閾値 |
+|  | frame_read_policy | フレーム読み出しポリシー。fifo=全フレーム処理 / latest=最新まで読み飛ばし / bounded_latest=最大 max_frame_skip 件まで読み飛ばし（既定 bounded_latest。不正値は警告の上 bounded_latest にフォールバック） |
+|  | max_frame_skip | bounded_latest 時に読み飛ばす最大フレーム数（既定 2） |
 | gui | window_width | ウィンドウの幅 |
 |  | window_height | ウィンドウの高さ |
 |  | window_x | ウィンドウ表示位置（X座標） |
 |  | window_y | ウィンドウ表示位置（Y座標） |
 |  | display_image_width | カメラ画像表示サイズ（幅） |
 |  | display_image_height | カメラ画像表示サイズ（高さ） |
+|  | frame_buffer_seconds | 追跡結果との同期表示用にカメラフレームを保持する秒数（既定 2.0） |
 | logging | level | ログレベル（INFO, DEBUG, WARNING, ERROR） |
-|  | output | ログ出力先（console固定） |
+|  | output | ログ出力先（console=標準出力。それ以外の文字列はファイルパスとして出力） |
 |  | performance_interval | performanceログの出力間隔（Nフレームごと、デフォルト100） |
 
 ## モジュール構成図

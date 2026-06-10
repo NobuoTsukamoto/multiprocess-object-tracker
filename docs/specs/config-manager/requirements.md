@@ -91,4 +91,4 @@
 
 ## 未確定 / 要レビュー事項
 
-- [ ] **README 設定表の同期ずれ**: `tracking.frame_read_policy` / `tracking.max_frame_skip` / `gui.frame_buffer_seconds` が README の設定表（`README.md:90-114`）に**載っていない**（`camera.source` は本変更で追記済み）。→ README を実態へ同期（タスク化済み）。
+- [x] **README 設定表の同期ずれ（解消済み）**: `tracking.frame_read_policy` / `tracking.max_frame_skip` / `gui.frame_buffer_seconds` を README の設定表へ追記し、実態へ同期した。

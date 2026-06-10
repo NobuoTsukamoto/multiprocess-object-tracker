@@ -46,5 +46,5 @@ multiprocess-object-tracker/
 
 - ファイル/モジュール名: `snake_case`。クラス: `PascalCase`。
 - IPC データ構造は [`data_models.py`](../../src/data_models.py) に集約（`@dataclass`）。新しい IPC メッセージはここに追加する。
-- 設定スキーマは [`config_manager.py`](../../src/config_manager.py) の dataclass に追加し、`config/default.yaml` と README の設定表を同期する。
+- 設定スキーマは [`config_manager.py`](../../src/config_manager.py) の dataclass に追加し、`config/default.yaml` と README の設定表を同期する。スキーマと全キーの消費側対応は [`config-manager` spec](../specs/config-manager/) を参照。
 - ドキュメント本文は日本語、識別子（型名・関数名・skill name 等）は英語。詳細は [`conventions.md`](conventions.md)。

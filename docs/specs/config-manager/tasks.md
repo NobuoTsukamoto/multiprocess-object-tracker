@@ -24,9 +24,9 @@
 ## タスク
 
 ### 文書化 / 整合
-- [ ] **README 設定表を実態に同期**（`README.md:90-116`）: 欠落している `tracking.frame_read_policy` / `tracking.max_frame_skip` / `gui.frame_buffer_seconds` を追加（`camera.source`・`detection_threshold`・`nms_iou_threshold` は追記済み）。
-- [ ] steering（`structure.md:48-49`）の「設定キー追加時は config_manager・default.yaml・README を同期」記述と本 spec をリンク。
-- [ ] `score_threshold` の実際の用途（ByteTrack 活性化閾値であり生検出フィルタではない）を README/設定表に注記。
+- [x] **README 設定表を実態に同期**: `tracking.frame_read_policy` / `tracking.max_frame_skip` / `gui.frame_buffer_seconds` を追加し、`logging.output` の「console固定」記述をファイルパス指定可に修正（logger spec R-LOG-03 と整合）。
+- [x] steering（`structure.md`）の「設定キー追加時は config_manager・default.yaml・README を同期」記述と本 spec をリンク。
+- [x] `score_threshold` の実際の用途（ByteTrack 活性化閾値であり生検出フィルタではない）を README 設定表に注記済み。
 
 ### テスト
 - [x] `tests/test_config_manager.py` を新設。空ファイル→`EmptyConfigError`（R-CM-09）、ファイル無し→`FileNotFoundError`（R-CM-06）、default.yaml 正常読込（R-CM-03）をカバー。
