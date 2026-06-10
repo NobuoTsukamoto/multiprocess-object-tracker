@@ -84,7 +84,7 @@ flowchart TD
 - **未知キー厳格 / 値無検証**: タイプミスは弾くが、値の不正は消費側まで遅延する。中途半端に見えるが「構造は守る・意味は使う側が知る」という分担（**推測**）。
 - **`camera.source` の型解釈は消費側に委譲（実装済み）**: スキーマは `Union[int, str]` で値を素通しし、int/数字文字列/パスURL の解釈（ルール B）は `CameraController._resolve_camera_source` が行う。ConfigManager に検証を持ち込まない方針と一致。出典 `src/config_manager.py:14-15`、`src/camera_controller.py:51-61`。
 - **未消費キーの削除（実装済み）**: `detection.fp16` と `tracking.max_track_num` をスキーマ・`default.yaml`・README 設定表から削除済み（R-CM-12）。FP16 は ONNX モデルを FP16 で作成して対応するため設定キー不要、`max_track_num` は用途無し。requirements「確定事項」参照。回帰テスト `ConfigManagerTest::test_removed_keys_are_rejected`。
-- **ハードコード値を設定キー化（実装済み）**: 生検出フィルタ `0.1`・NMS IoU `0.45` を `DetectionConfig` の `detection_threshold` / `nms_iou_threshold` へ昇格し、消費側を設定値へ差し替えた（`object_tracking_controller.py:205,208`）。なお `score_threshold` は ByteTrack 活性化閾値、`tracking.iou_threshold` は ByteTrack マッチング閾値で、いずれも NMS とは別物。命名で混同を避ける。出典 `src/config_manager.py:26-28`、`src/object_tracking_controller.py:139,141,205,208`。
+- **ハードコード値を設定キー化（実装済み）**: 生検出フィルタ `0.1`・NMS IoU `0.45` を `DetectionConfig` の `detection_threshold` / `nms_iou_threshold` へ昇格し、消費側を設定値へ差し替えた（`object_tracking_controller.py:127,129`）。なお `score_threshold` は ByteTrack 活性化閾値、`tracking.iou_threshold` は ByteTrack マッチング閾値で、いずれも NMS とは別物。命名で混同を避ける。出典 `src/config_manager.py:26-28`、`src/object_tracking_controller.py:165,167,127,129`。
 - **空ファイル検証は専用例外（実装済み）**: `_load_config` で `None` を検出し `EmptyConfigError`（`ValueError` 派生）をパス付きメッセージで送出する。`main.py` は `FileNotFoundError` と同じく専用ハンドラで捕捉し、ユーザーに分かりやすいメッセージで終了する。出典 `src/config_manager.py:69-70,83-84`、`src/main.py:41-43`。
 - **設定は UTF-8 固定で読む（実装済み）**: `open(encoding="utf-8")` によりプラットフォーム既定エンコーディング（cp932 等）に依存せず、非 ASCII の値/コメントでも安全に読める。出典 `src/config_manager.py:78-81`。
 

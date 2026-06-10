@@ -1,14 +1,16 @@
 import sys
 import unittest
 from pathlib import Path
+from queue import Empty, Full, Queue
 from unittest import mock
 
 import numpy as np
+import supervision as sv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from config_manager import ConfigManager
-from data_models import FrameRef
+from data_models import FrameRef, TrackingResult
 from object_tracking_controller import (
     FRAME_READ_TIMEOUT_SEC,
     ObjectTrackingController,
@@ -183,6 +185,113 @@ class PostprocessTest(unittest.TestCase):
         np.testing.assert_allclose(decoded[0, 52 * 52, 2:4], [16.0, 16.0])
         # Last anchor belongs to the stride-32 grid.
         np.testing.assert_allclose(decoded[0, -1, 2:4], [32.0, 32.0])
+
+
+class FilterDetectionsTest(unittest.TestCase):
+    # R-OTC-16: staged filters in order confidence -> NMS -> class -> area.
+    # Defaults: detection_threshold 0.1, nms_iou_threshold 0.45,
+    # class_id [0], min_box_area 100.
+
+    def test_each_stage_removes_its_candidate(self):
+        ctrl = make_controller()
+        detections = sv.Detections(
+            xyxy=np.array(
+                [
+                    [0, 0, 50, 50],  # survivor: conf .9, class 0, area 2500
+                    [2, 2, 52, 52],  # near-duplicate of survivor -> NMS
+                    [100, 100, 150, 150],  # conf .05 -> confidence filter
+                    [200, 200, 250, 250],  # class 1 -> class filter
+                    [300, 300, 305, 305],  # area 25 -> area filter
+                ],
+                dtype=float,
+            ),
+            confidence=np.array([0.9, 0.5, 0.05, 0.9, 0.9]),
+            class_id=np.array([0, 0, 0, 1, 0]),
+        )
+
+        filtered = ctrl._filter_detections(detections)
+
+        self.assertEqual(len(filtered), 1)
+        np.testing.assert_allclose(filtered.xyxy[0], [0, 0, 50, 50])
+        self.assertEqual(filtered.confidence[0], 0.9)
+
+    def test_confidence_is_exclusive_and_area_is_inclusive(self):
+        ctrl = make_controller()
+        detections = sv.Detections(
+            xyxy=np.array(
+                [
+                    [0, 0, 10, 10],  # area exactly 100 -> kept (>=)
+                    [100, 100, 150, 150],  # conf exactly 0.1 -> dropped (>)
+                ],
+                dtype=float,
+            ),
+            confidence=np.array([0.9, 0.1]),
+            class_id=np.array([0, 0]),
+        )
+
+        filtered = ctrl._filter_detections(detections)
+
+        self.assertEqual(len(filtered), 1)
+        np.testing.assert_allclose(filtered.xyxy[0], [0, 0, 10, 10])
+
+
+class PublishResultTest(unittest.TestCase):
+    # R-OTC-20: put_nowait; on Full drop the oldest and retry; if still
+    # Full, log a warning and drop the new result.
+
+    @staticmethod
+    def make_result(frame_id):
+        return TrackingResult(
+            frame_id=frame_id,
+            timestamp=0.0,
+            track_infos=[],
+            detections=None,
+            process_time_ms=0.0,
+        )
+
+    def test_puts_result_when_queue_has_space(self):
+        ctrl = make_controller()
+        ctrl.track_queue = Queue(maxsize=1)
+        result = self.make_result(1)
+
+        ctrl._publish_result(result)
+
+        self.assertIs(ctrl.track_queue.get_nowait(), result)
+
+    def test_full_queue_drops_oldest_and_keeps_newest(self):
+        ctrl = make_controller()
+        ctrl.track_queue = Queue(maxsize=1)
+        ctrl.track_queue.put_nowait(self.make_result(1))
+        newest = self.make_result(2)
+
+        ctrl._publish_result(newest)
+
+        self.assertIs(ctrl.track_queue.get_nowait(), newest)
+        with self.assertRaises(Empty):
+            ctrl.track_queue.get_nowait()
+
+    def test_persistently_full_queue_warns_and_drops_result(self):
+        class AlwaysFullQueue:
+            def __init__(self):
+                self.get_calls = 0
+
+            def put_nowait(self, item):
+                raise Full
+
+            def get_nowait(self):
+                self.get_calls += 1
+                raise Empty
+
+        ctrl = make_controller()
+        ctrl.track_queue = AlwaysFullQueue()
+        ctrl.logger = RecordingLogger()
+
+        ctrl._publish_result(self.make_result(1))  # must not raise
+
+        self.assertEqual(ctrl.track_queue.get_calls, 1)
+        warnings = ctrl.logger.messages("warning")
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("Track queue is full", warnings[0])
 
 
 class OnnxLoadFailureTest(unittest.TestCase):

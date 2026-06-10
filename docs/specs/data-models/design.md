@@ -39,7 +39,7 @@ WorkerError(source: str, message: str, timestamp: float)                        
 ## データ構造 / 状態
 
 - 本モジュールは **状態を持たない**（純粋なデータ定義）。各 dataclass はミュータブルだが、IPC では「生成側で詰める→Queue で転送→消費側で読む」という一方向の値受け渡しに使う。
-- `TrackingResult.detections` は `Any` 注釈で、実体は `supervision.Detections`（推論+NMS+追跡後の `tracked_detections`）。出典 `src/object_tracking_controller.py:234`、`src/data_models.py:33`。
+- `TrackingResult.detections` は `Any` 注釈で、実体は `supervision.Detections`（推論+NMS+追跡後の `tracked_detections`）。出典 `src/object_tracking_controller.py:251`、`src/data_models.py:33`。
 - `TrackInfo` は `track_id`/`class_id` の2フィールドのみ（box/score は `detections` に一本化し削除済み）。GUI はこれをリスト表示にのみ使う。出典 `src/data_models.py:20-23`、`src/gui_controller.py:583`。
 - `WorkerError` は状態を持たない通知用の値。`source` は `"camera"`/`"tracking"`、`message` は人間可読の理由、`timestamp` は送出時刻。ワーカーが `error_queue` に put し GUI が消費する。出典 `src/data_models.py:39-49`、`src/camera_controller.py:39-49`、`src/object_tracking_controller.py:46-56`。
 
@@ -49,26 +49,26 @@ WorkerError(source: str, message: str, timestamp: float)                        
 flowchart LR
     Cam[CameraController] -->|画像を共有メモリへ書込み<br/>FrameRef を data_queue へ| Pool[(SharedFramePool)]
     Pool -->|FrameRef + 画像コピー| OT[ObjectTrackingController]
-    OT -->|TrackInfo を構築 :217-224| TR[TrackingResult :230-238]
+    OT -->|TrackInfo を構築 :234-241| TR[TrackingResult :247-255]
     TR -->|track_queue.put| GUI[GUIController]
     GUI -->|frame_id で突合 :603-611| Render[オーバーレイ描画]
 ```
 
-- **生成**: `ObjectTrackingController` が推論→NMS→`sv.ByteTrack` 後、追跡ごとに `TrackInfo` を作り、`TrackingResult` にまとめて `track_queue` へ put（満杯時は最古を捨てる）。出典 `src/object_tracking_controller.py:217-252`。
+- **生成**: `ObjectTrackingController` が推論→NMS→`sv.ByteTrack` 後、追跡ごとに `TrackInfo` を作り、`TrackingResult` にまとめて `track_queue` へ put（満杯時は最古を捨てる）。出典 `src/object_tracking_controller.py:234-257`。
 - **消費**: `GUIController` が最新 `TrackingResult` を保持し、`process_time_ms`/`queue_latency_ms`/`total_latency_ms` を性能表示へ、`track_infos`/`detections` をオーバーレイ描画へ使う。出典 `src/gui_controller.py:555-611,701-728`。
 - **突き合わせ**: GUI は `TrackingResult.frame_id` をキーに、バッファ済みのカメラ画像（`_frame_buffer[fid]`）と結合して描画する。出典 `src/gui_controller.py:603-611`。
 
 ## 不変条件 / 前提条件
 
-- **picklable であること**: `multiprocessing.Queue` 転送のため、各フィールドは picklable。`TrackInfo` は `track_id`/`class_id` を `int()` に明示キャストして詰める。`detections`（`sv.Detections`）も pickle 可能。出典 `src/object_tracking_controller.py:220-223`。
-- **`frame_id` の一貫性**: `TrackingResult.frame_id == FrameRef.frame_id`（同一フレーム由来）。GUI の突合がこれに依存。出典 `src/object_tracking_controller.py:231`。
+- **picklable であること**: `multiprocessing.Queue` 転送のため、各フィールドは picklable。`TrackInfo` は `track_id`/`class_id` を `int()` に明示キャストして詰める。`detections`（`sv.Detections`）も pickle 可能。出典 `src/object_tracking_controller.py:237-240`。
+- **`frame_id` の一貫性**: `TrackingResult.frame_id == FrameRef.frame_id`（同一フレーム由来）。GUI の突合がこれに依存。出典 `src/object_tracking_controller.py:248`。
 - **後方互換**: 消費側は `queue_latency_ms`/`total_latency_ms` を `getattr(..., 0.0)` で読み、欠落を許容。`process_time_ms` は直接アクセス（当初からの必須）。出典 `src/gui_controller.py:566-572`、`src/data_models.py:35-36`。
-- **レイテンシ恒等式**: `total_latency_ms == queue_latency_ms + process_time_ms`（同一 `start_time`/`end_time`/`timestamp` 由来、浮動小数誤差を除く）。出典 `src/object_tracking_controller.py:163-165,226-228`。
+- **レイテンシ恒等式**: `total_latency_ms == queue_latency_ms + process_time_ms`（同一 `start_time`/`end_time`/`timestamp` 由来、浮動小数誤差を除く）。出典 `src/object_tracking_controller.py:189-191,243-245`。
   - `queue_latency_ms` = 撮像→推論開始（入力遅延。内部名 `last_input_lag_ms`、共有プール待ち含む）。`process_time_ms` = 推論開始→終了。`total_latency_ms` = 撮像→終了。
 
 ## エッジケース / 異常系
 
-- **追跡ゼロ**: `tracked_detections.tracker_id is None` のとき `track_infos` は空リスト。`TrackingResult` 自体は生成される。出典 `src/object_tracking_controller.py:217-224`。
+- **追跡ゼロ**: `tracked_detections.tracker_id is None` のとき `track_infos` は空リスト。`TrackingResult` 自体は生成される。出典 `src/object_tracking_controller.py:234-241`。
 - **旧フォーマット受信**: レイテンシ2フィールドが無い旧 `TrackingResult` でも、GUI 側 `getattr` で `0.0` 扱い。出典 `src/gui_controller.py:567-572`。
 - **`detections` 欠損/型不一致**: `Any` のため型チェックされない。非 `sv.Detections` が入ると消費側の描画（`gui_controller.py:611` 周辺）で失敗し得る（呼び出し規約に依存）。
 
@@ -83,7 +83,7 @@ flowchart LR
 ## 関連コードパス
 
 - `src/data_models.py:11-49` — 全 dataclass 定義（`FrameRef`/`TrackInfo`/`TrackingResult`/`WorkerError`）
-- `src/object_tracking_controller.py:217-238` — `TrackInfo`/`TrackingResult` の生成
+- `src/object_tracking_controller.py:234-255` — `TrackInfo`/`TrackingResult` の生成
 - `src/gui_controller.py:555-611,701-728` — `TrackingResult` の消費（性能表示・オーバーレイ）
 - `src/camera_controller.py:39-49` / `src/object_tracking_controller.py:46-56` — `WorkerError` の生成（`_report_error`）
 - `src/shared_frame_pool.py:184-255` — `FrameRef` の publish/取得（詳細は [`shared-frame-pool`](../shared-frame-pool/)）

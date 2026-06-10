@@ -121,6 +121,32 @@ class ObjectTrackingController(multiprocessing.Process):
 
         return outputs
 
+    def _filter_detections(self, detections: sv.Detections) -> sv.Detections:
+        """Apply the staged detection filters: confidence -> NMS -> class -> area."""
+        detections = detections[
+            detections.confidence > self.det_config.detection_threshold
+        ]
+        detections = detections.with_nms(threshold=self.det_config.nms_iou_threshold)
+        mask = np.isin(detections.class_id, self.track_config.class_id)
+        detections = detections[mask]
+        return detections[detections.area >= self.track_config.min_box_area]
+
+    def _publish_result(self, tracking_result: TrackingResult):
+        """Put the result on track_queue; when full, drop the oldest first."""
+        try:
+            self.track_queue.put_nowait(tracking_result)
+        except Full:
+            # Drop oldest tracking result so the GUI sees the
+            # most recent inference, not stale ones.
+            try:
+                self.track_queue.get_nowait()
+            except Empty:
+                pass
+            try:
+                self.track_queue.put_nowait(tracking_result)
+            except Full:
+                self.logger.warning("Track queue is full; dropped result.")
+
     def run(self):
         self.logger = Logger(self.logging_config).get_logger()
         self.logger.info("ObjectTrackingController process started.")
@@ -201,16 +227,7 @@ class ObjectTrackingController(multiprocessing.Process):
                     confidence=confidences,
                     class_id=class_ids,
                 )
-                detections = detections[
-                    detections.confidence > self.det_config.detection_threshold
-                ]
-                detections = detections.with_nms(
-                    threshold=self.det_config.nms_iou_threshold
-                )
-
-                mask = np.isin(detections.class_id, self.track_config.class_id)
-                detections = detections[mask]
-                detections = detections[detections.area >= self.track_config.min_box_area]
+                detections = self._filter_detections(detections)
 
                 tracked_detections = tracker.update_with_detections(detections=detections)
 
@@ -237,19 +254,7 @@ class ObjectTrackingController(multiprocessing.Process):
                     total_latency_ms=total_latency_ms,
                 )
 
-                try:
-                    self.track_queue.put_nowait(tracking_result)
-                except Full:
-                    # Drop oldest tracking result so the GUI sees the
-                    # most recent inference, not stale ones.
-                    try:
-                        self.track_queue.get_nowait()
-                    except Empty:
-                        pass
-                    try:
-                        self.track_queue.put_nowait(tracking_result)
-                    except Full:
-                        self.logger.warning("Track queue is full; dropped result.")
+                self._publish_result(tracking_result)
 
                 frame_count += 1
                 if frame_count % self.logging_config.performance_interval == 0:

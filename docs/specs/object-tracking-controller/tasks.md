@@ -4,7 +4,7 @@
 
 ## テストカバレッジ状況（逆生成時）
 
-[`tests/test_object_tracking_controller.py`](../../../tests/test_object_tracking_controller.py) が純関数寄りの `_read_frame`/`_preprocess`/`_postprocess` と、ONNX ロード失敗・`_report_error` をカバーする。`run()` の追跡ループ本体（フィルタ・queue Full 等）は未カバー（`sv.ByteTrack` 等のモック化が要る）。
+[`tests/test_object_tracking_controller.py`](../../../tests/test_object_tracking_controller.py) が純関数寄りの `_read_frame`/`_preprocess`/`_postprocess`、ONNX ロード失敗・`_report_error`、抽出済みの `_filter_detections`/`_publish_result` をカバーする。`run()` ループの結線部分は未カバー（`sv.ByteTrack` 等のモック統合テストが要る）。
 
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
@@ -20,11 +20,11 @@
 | R-OTC-13（input_lag/delta/skipped） | — | ⬜ 未カバー |
 | R-OTC-14（前処理/後処理） | `PreprocessTest`（形状/dtype/ratio/パディング）、`PostprocessTest`（グリッドデコード） | ✅ カバー済み |
 | R-OTC-15（xyxy/スコア） | — | ⬜ 未カバー |
-| R-OTC-16（段階フィルタ） | — | ⬜ 未カバー（`run()` 内インライン。要モック整備） |
+| R-OTC-16（段階フィルタ） | `FilterDetectionsTest`（各段の除去・境界） | ✅ カバー済み（`_filter_detections` 抽出済み） |
 | R-OTC-17（ByteTrack 更新） | — | ⬜ 未カバー |
 | R-OTC-18（TrackInfo 構築） | — | ⬜ 未カバー |
 | R-OTC-19（TrackingResult 構築） | — | ⬜ 未カバー |
-| R-OTC-20（queue Full→drop-oldest） | — | ⬜ 未カバー（`run()` 内インライン。要モック整備） |
+| R-OTC-20（queue Full→drop-oldest） | `PublishResultTest`（空き/Full→最古破棄/なお Full→warning） | ✅ カバー済み（`_publish_result` 抽出済み） |
 | R-OTC-21（PERFORMANCE ログ） | — | ⬜ 未カバー |
 | R-OTC-22（finally 後始末） | — | ⬜ 未カバー |
 | R-OTC-23（ONNX 失敗→GUI 通知） | `OnnxLoadFailureTest`、`ReportErrorTest`（put/None/put 失敗） | ✅ カバー済み |
@@ -41,18 +41,23 @@
   - [x] `_read_frame` が各ポリシーで適切な呼び出しと3-tuple を返すこと（R-OTC-09、`ReadFrameTest`）。
   - [x] 未知ポリシーで warning＋bounded_latest フォールバック（R-OTC-10）。
   - [x] `_preprocess` の出力形状/dtype/ratio（R-OTC-14、`PreprocessTest`。`_postprocess` のグリッドデコードも `PostprocessTest` で検証）。
-  - [ ] 段階フィルタ（confidence/NMS/class/area）の境界（R-OTC-16）。`run()` 内インラインのため要モック整備（または抽出リファクタ）。
-  - [ ] `track_queue` Full 時の drop-oldest（R-OTC-20）。同上。
+  - [x] 段階フィルタ（confidence/NMS/class/area）の境界（R-OTC-16、`FilterDetectionsTest`）。`_filter_detections` に `sv.Detections` を直接渡して検証（confidence は排他 `>`、area は包含 `>=` の境界含む）。
+  - [x] `track_queue` Full 時の drop-oldest（R-OTC-20、`PublishResultTest`）。`queue.Queue(maxsize=1)` と常時 Full スタブで検証。
+
+### リファクタ（✅完了: テスト可能化、挙動不変）
+- [x] `run()` の段階フィルタ4式を `_filter_detections(detections) -> sv.Detections` へ抽出（R-OTC-16、`object_tracking_controller.py:124-132`）。
+- [x] `run()` の `track_queue` 送出（put_nowait→Full→最古破棄→再put→warning）を `_publish_result(tracking_result)` へ抽出（R-OTC-20、`:134-148`）。
+- [x] 抽出後の行番号ずれを spec（requirements/design/tasks、config-manager・logger・gui-controller・data-models の参照元）へ反映。
   - [x] ONNX ロード失敗で早期 return（R-OTC-05、`InferenceSession` モック、`OnnxLoadFailureTest`）。
 
 ### 実装（✅完了）
-- [x] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`_report_error`、`object_tracking_controller.py:46-56,135`）。コンストラクタに `error_queue` 引数を追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。
+- [x] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`_report_error`、`object_tracking_controller.py:46-56,161`）。コンストラクタに `error_queue` 引数を追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。
 - [x] **`_report_error` のテスト**（R-OTC-05/23）: `error_queue` スタブで ONNX ロード失敗時に `WorkerError` が put され早期 return することを検証（`OnnxLoadFailureTest`/`ReportErrorTest`）。
-- [x] **検出閾値の設定化**（**実装済み**）: 生検出 confidence フィルタ→`self.det_config.detection_threshold`（`:205`）、NMS→`self.det_config.nms_iou_threshold`（`:208`）に差し替え。`config_manager`/`default.yaml`/README も同期。既定は従来同値（0.1 / 0.45）で挙動不変。
+- [x] **検出閾値の設定化**（**実装済み**）: 生検出 confidence フィルタ→`self.det_config.detection_threshold`（`:127`）、NMS→`self.det_config.nms_iou_threshold`（`:129`）に差し替え。`config_manager`/`default.yaml`/README も同期。既定は従来同値（0.1 / 0.45）で挙動不変。
 
 ### 実装 / 改善（将来）
 - [ ] **他モデル対応**（将来）: YOLOX 固定（`p6=False`、strides `[8,16,32]`、`scores=obj×cls`）を脱し、他検出モデル/他ストライド構成に対応。今回は対象外（当面 YOLOX 固定で確定）。
-- [ ] `input_name = session.get_inputs()[0].name` をループ外へ巻き上げ（`:176`、軽微な最適化）。
+- [ ] `input_name = session.get_inputs()[0].name` をループ外へ巻き上げ（`:202`、軽微な最適化）。
 - [ ] 例外耐性: 推論中の例外（不正フレーム等）を握って継続するか、致命扱いにするかの方針明文化。
 - [ ] 型注釈の補強（`_read_frame`/`_preprocess`/`_postprocess` の戻り値型）。
 
@@ -62,7 +67,7 @@
 - ✅ 当面 **YOLOX 固定**で進める（他モデル対応は将来）。
 - ✅ 検出閾値を設定キー化（**実装済み**）: `0.1`→`detection.detection_threshold`、`0.45`→`detection.nms_iou_threshold`。消費側を `self.det_config.*` へ差し替え（既定同値で挙動不変）。
 - 🔎 `_read_frame` は `read`(2-tuple)/`read_latest`(3-tuple) を `(frame_ref, image, skipped)` に正規化（`fifo` は skip=0）。
-- 🔎 検出フィルタ順は confidence→NMS→class→area。NMS はクラス選別前に全体へ適用。
+- 🔎 検出フィルタ順は confidence→NMS→class→area（`_filter_detections` に抽出済み）。NMS はクラス選別前に全体へ適用。confidence は排他 `>`、area は包含 `>=`。
 - 🔎 空検出/`tracker_id` None でも `TrackingResult` は送出（`track_infos` 空）。
 - 🔎 レイテンシ恒等式 `total == queue + process`（data-models spec と共通）。
-- ✅ 純関数寄りの `_preprocess`/`_postprocess`/`_read_frame` と ONNX 失敗系のテストを整備済み（12 テスト）。残る大物は `run()` ループ本体（R-OTC-16/20 等）で、`sv.ByteTrack`/セッションのモック整備か処理の関数抽出が前提。
+- ✅ 純関数寄りの `_preprocess`/`_postprocess`/`_read_frame`、ONNX 失敗系、段階フィルタ（`_filter_detections`）、送出（`_publish_result`）のテストを整備済み（17 テスト）。残りは `run()` ループの結線部分（R-OTC-08/11〜13/15/17〜19/21/22）で、カバーするなら ONNX セッション・ByteTrack を含むループ全体のモック統合テストが要る。

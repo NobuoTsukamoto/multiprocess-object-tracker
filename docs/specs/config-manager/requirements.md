@@ -10,7 +10,7 @@
 - **スコープ内**: 設定スキーマ（5つの `@dataclass` + 集約 `AppConfig`）の定義・デフォルト値、`ConfigManager` の読み込み（`_load_config`/`_create_app_config`）・取得（`get_config`）、欠落/未知キー/不正パス等の挙動。
 - **スコープ外**:
   - 各設定値を**消費する側**のロジック（camera/object_tracking/gui controller, logger）。本 spec では「どのキーがどこで使われるか」を出典付きで一覧化するに留める。
-  - `frame_read_policy` の妥当値検証（消費側 [`object_tracking_controller.py:44-65`](../../../src/object_tracking_controller.py) が担う）。
+  - `frame_read_policy` の妥当値検証（消費側 [`object_tracking_controller.py:58-80`](../../../src/object_tracking_controller.py) が担う）。
   - 引数解析・例外の最終ハンドリング（[`main.py:18-43`](../../../src/main.py)）。
 
 ## 用語集
@@ -48,20 +48,20 @@
 | セクション.キー | 既定値 | 消費側出典 | 状態 |
 |:--|:--|:--|:--|
 | camera.source | 0 | `camera_controller.py:86`（`_resolve_camera_source` 経由） | ✅ |
-| camera.fps | 30 | `camera_controller.py:97`, `gui_controller.py:117`, `object_tracking_controller.py:142` | ✅ |
+| camera.fps | 30 | `camera_controller.py:97`, `gui_controller.py:117`, `object_tracking_controller.py:168` | ✅ |
 | camera.width | 1280 | `camera_controller.py:95` | ✅ |
 | camera.height | 720 | `camera_controller.py:96` | ✅ |
 | camera.max_queue_length | 10 | `gui_controller.py:64` | ✅ |
-| detection.model_path | models/yolox_s.onnx | `object_tracking_controller.py:129` | ✅ |
-| detection.providers | ["CPUExecutionProvider"] | `object_tracking_controller.py:129` | ✅ |
-| detection.score_threshold | 0.5 | `object_tracking_controller.py:139`（ByteTrack の `track_activation_threshold`） | ✅ ※後述 |
+| detection.model_path | models/yolox_s.onnx | `object_tracking_controller.py:155` | ✅ |
+| detection.providers | ["CPUExecutionProvider"] | `object_tracking_controller.py:155` | ✅ |
+| detection.score_threshold | 0.5 | `object_tracking_controller.py:165`（ByteTrack の `track_activation_threshold`） | ✅ ※後述 |
 | detection.class_names | [] | `gui_controller.py:576,647` | ✅ |
-| detection.detection_threshold | 0.1 | `object_tracking_controller.py:205` | ✅（設定キー化済み） |
-| detection.nms_iou_threshold | 0.45 | `object_tracking_controller.py:208` | ✅（設定キー化済み） |
-| tracking.class_id | [0] | `object_tracking_controller.py:211` | ✅ |
-| tracking.max_lost | 30 | `object_tracking_controller.py:140` | ✅ |
-| tracking.min_box_area | 100 | `object_tracking_controller.py:213` | ✅ |
-| tracking.iou_threshold | 0.5 | `object_tracking_controller.py:141` | ✅ |
+| detection.detection_threshold | 0.1 | `object_tracking_controller.py:127` | ✅（設定キー化済み） |
+| detection.nms_iou_threshold | 0.45 | `object_tracking_controller.py:129` | ✅（設定キー化済み） |
+| tracking.class_id | [0] | `object_tracking_controller.py:130-131` | ✅ |
+| tracking.max_lost | 30 | `object_tracking_controller.py:166` | ✅ |
+| tracking.min_box_area | 100 | `object_tracking_controller.py:132` | ✅ |
+| tracking.iou_threshold | 0.5 | `object_tracking_controller.py:167` | ✅ |
 | tracking.frame_read_policy | bounded_latest | `object_tracking_controller.py:60` | ✅ |
 | tracking.max_frame_skip | 2 | `object_tracking_controller.py:70,79` | ✅ |
 | gui.window_width/height/x/y | 1600/900/100/100 | `gui_controller.py:57-58` | ✅ |
@@ -69,22 +69,22 @@
 | gui.frame_buffer_seconds | 2.0 | `gui_controller.py:118` | ✅ |
 | logging.level | INFO | `logger.py:21` | ✅ |
 | logging.output | console | `logger.py:20` | ✅ |
-| logging.performance_interval | 100 | `object_tracking_controller.py:255,258` | ✅ |
+| logging.performance_interval | 100 | `object_tracking_controller.py:260,263` | ✅ |
 
 ## 前提条件 / 不変条件
 
 - **デフォルトで完全動作**: すべてのフィールドにデフォルトがあるため、空セクション（または欠落セクション）でも当該設定は構築できる。全セクション欠落でも `config_dict` が `{}` なら `AppConfig` は全デフォルトで成立する。**ただしファイルが完全に空（`None`）の場合は別扱い**（R-CM-09、`EmptyConfigError`）。出典 `src/config_manager.py:15-57,83-94`。
 - **未知キーは拒否**: `**config_dict.get(section, {})` 展開のため、未定義キーは黙殺されず `TypeError` になる（タイプミス検出に寄与）。出典 `src/config_manager.py:87-94`。
 - **検証は消費側**: 値の妥当性（例: `frame_read_policy` が `fifo`/`latest`/`bounded_latest` のいずれか）は ConfigManager では検証せず、消費側が `getattr` 既定やフォールバックで吸収する。出典 `src/object_tracking_controller.py:58-80`。
-- **`score_threshold` の意味**: 生検出のスコアフィルタ（`detection.detection_threshold`、`object_tracking_controller.py:205`）ではなく、ByteTrack の `track_activation_threshold` として使われる。出典 `src/object_tracking_controller.py:139`。
-- **3つのしきい値は別物**: `detection.detection_threshold`（生検出 confidence フィルタ、`:205`）/ `detection.nms_iou_threshold`（NMS IoU、`:208`）/ `detection.score_threshold`（ByteTrack 活性化、`:139`）/ `tracking.iou_threshold`（ByteTrack マッチング、`:141`）はそれぞれ用途が異なる。出典 `src/object_tracking_controller.py:139,141,205,208`、[`object-tracking-controller`](../object-tracking-controller/)。
+- **`score_threshold` の意味**: 生検出のスコアフィルタ（`detection.detection_threshold`、`object_tracking_controller.py:127`）ではなく、ByteTrack の `track_activation_threshold` として使われる。出典 `src/object_tracking_controller.py:165`。
+- **3つのしきい値は別物**: `detection.detection_threshold`（生検出 confidence フィルタ、`:205`）/ `detection.nms_iou_threshold`（NMS IoU、`:208`）/ `detection.score_threshold`（ByteTrack 活性化、`:139`）/ `tracking.iou_threshold`（ByteTrack マッチング、`:141`）はそれぞれ用途が異なる。出典 `src/object_tracking_controller.py:165,167,127,129`、[`object-tracking-controller`](../object-tracking-controller/)。
 - **`camera.source` の型解釈は消費側**: `CameraConfig.source` は値を素通しで保持し（既定 `0`）、int/数字文字列/パスURL の解釈は `CameraController._resolve_camera_source` が担う（ルール B）。出典 `src/config_manager.py:14-15`、`src/camera_controller.py:51-61`、[`camera-controller`](../camera-controller/)。
 
 ## 確定事項（レビュー反映済み）
 
 - ✅ **`detection.fp16` は削除（実装済み）**: FP16 推論は ONNX モデル自体を FP16 で作成して対応する方針のため、設定キーは不要。スキーマ・`default.yaml`・README 設定表から除去済み（R-CM-12）。回帰テスト `ConfigManagerTest::test_removed_keys_are_rejected`。
 - ✅ **`tracking.max_track_num` は削除（実装済み）**: ByteTrack に同時追跡上限を渡す実装は無く、用途が無い。スキーマ・`default.yaml`・README 設定表から除去済み（R-CM-12）。回帰テスト `ConfigManagerTest::test_removed_keys_are_rejected`。
-- ✅ **NMS 関連を設定キー化（実装済み）**: 生検出フィルタ閾値 `0.1` と NMS IoU `0.45` を `DetectionConfig` の **`detection.detection_threshold`**（既定 0.1、`config_manager.py:27`）/ **`detection.nms_iou_threshold`**（既定 0.45、`:28`）へ昇格。消費側を設定値へ差し替え済み（`object_tracking_controller.py:205,208`）。既存 `score_threshold`（ByteTrack 活性化）・`tracking.iou_threshold`（ByteTrack マッチング）とは別物。`default.yaml`・README も同期済み。
+- ✅ **NMS 関連を設定キー化（実装済み）**: 生検出フィルタ閾値 `0.1` と NMS IoU `0.45` を `DetectionConfig` の **`detection.detection_threshold`**（既定 0.1、`config_manager.py:27`）/ **`detection.nms_iou_threshold`**（既定 0.45、`:28`）へ昇格。消費側を設定値へ差し替え済み（`object_tracking_controller.py:127,129`）。既存 `score_threshold`（ByteTrack 活性化）・`tracking.iou_threshold`（ByteTrack マッチング）とは別物。`default.yaml`・README も同期済み。
 - ✅ **`camera.source` を追加（実装済み）**: `CameraConfig` に `source: Union[int, str] = 0` を追加（`config_manager.py:14-15`）。`default.yaml`・README 設定表も同期済み。型解釈（ルール B）は消費側 `CameraController._resolve_camera_source` が担う（camera-controller R-CAM-13a〜d）。
 - ✅ **空ファイル時は専用例外で明示的検証（実装済み）**: `_load_config` で `config_dict is None` を検出し、**専用例外 `EmptyConfigError`**（`ValueError` サブクラス、メッセージにパスを含む）を送出する（R-CM-09、`config_manager.py:69-70,83-84`）。`main.py` は `FileNotFoundError` と同様の専用ハンドラで捕捉し stderr 出力＋`exit(1)`（`main.py:41-43`）。
 - ✅ **設定ファイルは UTF-8 で読む（実装済み）**: `open(..., encoding="utf-8")` で読み込み、日本語 Windows（cp932）等のプラットフォーム既定エンコーディングに依存しない（R-CM-11、`config_manager.py:78-81`）。`default.yaml` の非 ASCII コメント等が原因の `UnicodeDecodeError` を防ぐ。

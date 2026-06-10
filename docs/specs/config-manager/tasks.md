@@ -48,7 +48,7 @@
 
 ### 実装（✅完了）
 - [x] **`camera.source` の追加**（camera-controller R-CAM-13、**実装済み**）: `CameraConfig` に `source: Union[int, str] = 0` を追加（`config_manager.py:14-15`）。`default.yaml`・README 設定表も同期。型解釈は消費側 `CameraController._resolve_camera_source`。
-- [x] **NMS 関連の設定キー化**（**実装済み**）: `DetectionConfig` に `detection_threshold`（既定 0.1、`config_manager.py:27`）・`nms_iou_threshold`（既定 0.45、`:28`）を追加し、`object_tracking_controller.py:205,208` のハードコードを差し替え。`default.yaml`・README 設定表も同期。`ConfigManagerTest::test_detection_threshold_keys_have_defaults` 追加。
+- [x] **NMS 関連の設定キー化**（**実装済み**）: `DetectionConfig` に `detection_threshold`（既定 0.1、`config_manager.py:27`）・`nms_iou_threshold`（既定 0.45、`:28`）を追加し、`object_tracking_controller.py:127,129` のハードコードを差し替え。`default.yaml`・README 設定表も同期。`ConfigManagerTest::test_detection_threshold_keys_have_defaults` 追加。
 - [x] **空ファイル時の専用例外**（R-CM-09、**実装済み**）: `_load_config`（`config_manager.py:77-85`）で `config_dict is None` を検出し `EmptyConfigError`（`ValueError` 派生、`:69-70`）をパス付きで送出。`main.py:41-43` に専用ハンドラ追加。`ConfigManagerTest::test_empty_file_raises_empty_config_error` 追加。
 - [x] **設定ファイルの UTF-8 読み込み**（R-CM-11、**実装済み**）: `open(encoding="utf-8")`（`config_manager.py:78-81`）。default.yaml の非 ASCII コメント（`camera.source`）による cp932 `UnicodeDecodeError` を修正。
 
