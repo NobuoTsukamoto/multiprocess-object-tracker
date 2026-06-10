@@ -1,3 +1,4 @@
+import multiprocessing
 import sys
 import unittest
 from pathlib import Path
@@ -59,6 +60,41 @@ class ResolveCameraSourceTest(unittest.TestCase):
             CameraController._resolve_camera_source("rtsp://host/stream"),
             "rtsp://host/stream",
         )
+
+
+class InitStateTest(unittest.TestCase):
+    # R-CAM-01/02: Process subclass; the constructor keeps the injected
+    # collaborators as-is and initializes frame_id to 0 (logger stays None
+    # until run() configures it in the child process).
+
+    def test_subclasses_multiprocessing_process(self):
+        self.assertTrue(issubclass(CameraController, multiprocessing.Process))
+
+    def test_init_keeps_collaborators_and_zeroes_frame_id(self):
+        manager = ConfigManager(str(DEFAULT_CONFIG))
+        logging_config = manager.get_config("logging")
+        tracking_spec = object()
+        gui_spec = object()
+        stop_event = object()
+        error_queue = object()
+
+        ctrl = CameraController(
+            config_manager=manager,
+            logging_config=logging_config,
+            tracking_pool_spec=tracking_spec,
+            gui_pool_spec=gui_spec,
+            stop_event=stop_event,
+            error_queue=error_queue,
+        )
+
+        self.assertIs(ctrl.config, manager.get_config("camera"))
+        self.assertIs(ctrl.logging_config, logging_config)
+        self.assertIs(ctrl.tracking_pool_spec, tracking_spec)
+        self.assertIs(ctrl.gui_pool_spec, gui_spec)
+        self.assertIs(ctrl.stop_event, stop_event)
+        self.assertIs(ctrl.error_queue, error_queue)
+        self.assertEqual(ctrl.frame_id, 0)
+        self.assertIsNone(ctrl.logger)
 
 
 class RecordingLogger:

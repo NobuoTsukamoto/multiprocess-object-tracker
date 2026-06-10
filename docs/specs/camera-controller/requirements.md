@@ -29,8 +29,8 @@
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-CAM-01 | ユビキタス | システムは `CameraController` を `multiprocessing.Process` のサブクラスとして定義し、独立プロセスで動作させること。 | `src/camera_controller.py:19` | — |
-| R-CAM-02 | イベント駆動 | 生成されたとき、システムは camera 設定・logging 設定・追跡用/GUI 用 spec・`stop_event`・`error_queue` を保持し、`frame_id` を 0 に初期化すること。 | `src/camera_controller.py:20-37` | — |
+| R-CAM-01 | ユビキタス | システムは `CameraController` を `multiprocessing.Process` のサブクラスとして定義し、独立プロセスで動作させること。 | `src/camera_controller.py:19` | `tests/test_camera_controller.py::InitStateTest::test_subclasses_multiprocessing_process` |
+| R-CAM-02 | イベント駆動 | 生成されたとき、システムは camera 設定・logging 設定・追跡用/GUI 用 spec・`stop_event`・`error_queue` を保持し、`frame_id` を 0 に初期化すること。 | `src/camera_controller.py:20-37` | `tests/test_camera_controller.py::InitStateTest::test_init_keeps_collaborators_and_zeroes_frame_id` |
 | R-CAM-03 | イベント駆動 | `run()` 開始時、システムは**子プロセス内で**ロガーを構成し、2つの `SharedFrameAccessor` をアタッチすること。 | `src/camera_controller.py:79-84` | — |
 | R-CAM-04 | 異常系 | カメラを開けないとき、システムは error をログし、両プールを `close` して `run()` を終了すること。 | `src/camera_controller.py:88-93` | `tests/test_camera_controller.py::CameraRunTest::test_open_failure_reports_error_closes_pools_and_returns` |
 | R-CAM-05 | ユビキタス | システムはカメラへ解像度（width/height）と FPS を設定値で**要求**すること（カメラが従う保証はない）。 | `src/camera_controller.py:95-97` | — |
