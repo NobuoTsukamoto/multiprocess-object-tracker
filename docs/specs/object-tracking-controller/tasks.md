@@ -4,30 +4,30 @@
 
 ## テストカバレッジ状況（逆生成時）
 
-専用テストは**存在しない**（`tests/test_object_tracking_controller.py` 無し）。全要求が未カバー。ONNX/ByteTrack 依存のため、`onnxruntime.InferenceSession` と `sv.ByteTrack` のモック化、または小型ダミーモデルが要る。
+[`tests/test_object_tracking_controller.py`](../../../tests/test_object_tracking_controller.py) が純関数寄りの `_read_frame`/`_preprocess`/`_postprocess` と、ONNX ロード失敗・`_report_error` をカバーする。`run()` の追跡ループ本体（フィルタ・queue Full 等）は未カバー（`sv.ByteTrack` 等のモック化が要る）。
 
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
 | R-OTC-01〜04（init/ロード） | — | ⬜ 未カバー |
-| R-OTC-05（ONNX 失敗→通知→終了） | — | ⬜ 未カバー（実装済み） |
+| R-OTC-05（ONNX 失敗→通知→終了） | `OnnxLoadFailureTest::test_load_failure_reports_worker_error_and_returns` | ✅ カバー済み |
 | R-OTC-06（ByteTrack 初期化） | — | ⬜ 未カバー |
 | R-OTC-07（アタッチ） | — | ⬜ 未カバー |
 | R-OTC-08（stop までループ） | — | ⬜ 未カバー |
-| R-OTC-09（ポリシー別読み出し） | — | ⬜ 未カバー |
-| R-OTC-10（未知ポリシー→fallback） | — | ⬜ 未カバー |
+| R-OTC-09（ポリシー別読み出し） | `ReadFrameTest`（fifo/latest/bounded_latest/負値クランプ） | ✅ カバー済み |
+| R-OTC-10（未知ポリシー→fallback） | `ReadFrameTest::test_unknown_policy_warns_and_falls_back_to_bounded_latest` | ✅ カバー済み |
 | R-OTC-11（Empty→continue） | — | ⬜ 未カバー |
 | R-OTC-12（取得後 stop→break） | — | ⬜ 未カバー |
 | R-OTC-13（input_lag/delta/skipped） | — | ⬜ 未カバー |
-| R-OTC-14（前処理/後処理） | — | ⬜ 未カバー |
+| R-OTC-14（前処理/後処理） | `PreprocessTest`（形状/dtype/ratio/パディング）、`PostprocessTest`（グリッドデコード） | ✅ カバー済み |
 | R-OTC-15（xyxy/スコア） | — | ⬜ 未カバー |
-| R-OTC-16（段階フィルタ） | — | ⬜ 未カバー |
+| R-OTC-16（段階フィルタ） | — | ⬜ 未カバー（`run()` 内インライン。要モック整備） |
 | R-OTC-17（ByteTrack 更新） | — | ⬜ 未カバー |
 | R-OTC-18（TrackInfo 構築） | — | ⬜ 未カバー |
 | R-OTC-19（TrackingResult 構築） | — | ⬜ 未カバー |
-| R-OTC-20（queue Full→drop-oldest） | — | ⬜ 未カバー |
+| R-OTC-20（queue Full→drop-oldest） | — | ⬜ 未カバー（`run()` 内インライン。要モック整備） |
 | R-OTC-21（PERFORMANCE ログ） | — | ⬜ 未カバー |
 | R-OTC-22（finally 後始末） | — | ⬜ 未カバー |
-| R-OTC-23（ONNX 失敗→GUI 通知） | — | ⬜ 未カバー（実装済み） |
+| R-OTC-23（ONNX 失敗→GUI 通知） | `OnnxLoadFailureTest`、`ReportErrorTest`（put/None/put 失敗） | ✅ カバー済み |
 
 ## タスク
 
@@ -37,17 +37,17 @@
 - [ ] YOLOX 前提（`p6=False`、strides `[8,16,32]`）を README/設計に明記。
 
 ### テスト
-- [ ] `tests/test_object_tracking_controller.py` を新設（`_preprocess`/`_postprocess`/`_read_frame` は純関数的に単体テスト可能）。
-  - [ ] `_read_frame` が各ポリシーで適切な呼び出しと3-tuple を返すこと（R-OTC-09）。
-  - [ ] 未知ポリシーで warning＋bounded_latest フォールバック（R-OTC-10）。
-  - [ ] `_preprocess` の出力形状/dtype/ratio（R-OTC-14）。
-  - [ ] 段階フィルタ（confidence/NMS/class/area）の境界（R-OTC-16）。
-  - [ ] `track_queue` Full 時の drop-oldest（R-OTC-20）。
-  - [ ] ONNX ロード失敗で早期 return（R-OTC-05、`InferenceSession` モック）。
+- [x] `tests/test_object_tracking_controller.py` を新設（`_preprocess`/`_postprocess`/`_read_frame` は純関数的に単体テスト可能）。
+  - [x] `_read_frame` が各ポリシーで適切な呼び出しと3-tuple を返すこと（R-OTC-09、`ReadFrameTest`）。
+  - [x] 未知ポリシーで warning＋bounded_latest フォールバック（R-OTC-10）。
+  - [x] `_preprocess` の出力形状/dtype/ratio（R-OTC-14、`PreprocessTest`。`_postprocess` のグリッドデコードも `PostprocessTest` で検証）。
+  - [ ] 段階フィルタ（confidence/NMS/class/area）の境界（R-OTC-16）。`run()` 内インラインのため要モック整備（または抽出リファクタ）。
+  - [ ] `track_queue` Full 時の drop-oldest（R-OTC-20）。同上。
+  - [x] ONNX ロード失敗で早期 return（R-OTC-05、`InferenceSession` モック、`OnnxLoadFailureTest`）。
 
 ### 実装（✅完了）
 - [x] **ONNX ロード失敗の GUI 通知**（R-OTC-23）: error ログに加え `error_queue` へ `data_models.WorkerError(source="tracking", ...)` を送って `return`（`_report_error`、`object_tracking_controller.py:46-56,135`）。コンストラクタに `error_queue` 引数を追加。GUI 側は [`gui-controller`](../gui-controller/) R-GUI-44 で受信・表示。通知機構は camera-controller R-CAM-14 と共通（**ステータス Queue に確定**）。
-- [ ] **`_report_error` のテスト**（R-OTC-05/23）: `error_queue` スタブで ONNX ロード失敗時に `WorkerError` が put され早期 return することを検証。
+- [x] **`_report_error` のテスト**（R-OTC-05/23）: `error_queue` スタブで ONNX ロード失敗時に `WorkerError` が put され早期 return することを検証（`OnnxLoadFailureTest`/`ReportErrorTest`）。
 - [x] **検出閾値の設定化**（**実装済み**）: 生検出 confidence フィルタ→`self.det_config.detection_threshold`（`:205`）、NMS→`self.det_config.nms_iou_threshold`（`:208`）に差し替え。`config_manager`/`default.yaml`/README も同期。既定は従来同値（0.1 / 0.45）で挙動不変。
 
 ### 実装 / 改善（将来）
@@ -65,4 +65,4 @@
 - 🔎 検出フィルタ順は confidence→NMS→class→area。NMS はクラス選別前に全体へ適用。
 - 🔎 空検出/`tracker_id` None でも `TrackingResult` は送出（`track_infos` 空）。
 - 🔎 レイテンシ恒等式 `total == queue + process`（data-models spec と共通）。
-- 専用テスト皆無。純関数寄りの `_preprocess`/`_postprocess`/`_read_frame` から着手するのが費用対効果が高い。
+- ✅ 純関数寄りの `_preprocess`/`_postprocess`/`_read_frame` と ONNX 失敗系のテストを整備済み（12 テスト）。残る大物は `run()` ループ本体（R-OTC-16/20 等）で、`sv.ByteTrack`/セッションのモック整備か処理の関数抽出が前提。
