@@ -10,7 +10,7 @@
 |:--|:--|:--|
 | R-CAM-01（Process サブクラス） | `InitStateTest::test_subclasses_multiprocessing_process` | ✅ カバー済み |
 | R-CAM-02（init 状態） | `InitStateTest::test_init_keeps_collaborators_and_zeroes_frame_id` | ✅ カバー済み |
-| R-CAM-03（子プロセスでアタッチ） | — | ⬜ 未カバー |
+| R-CAM-03（子プロセスでアタッチ） | `CameraRunTest::test_run_configures_logger_and_attaches_both_pools` | ✅ カバー済み |
 | R-CAM-04（open 失敗→終了） | `CameraRunTest::test_open_failure_reports_error_closes_pools_and_returns` | ✅ カバー済み |
 | R-CAM-05（解像度/FPS 要求） | `CameraRunTest::test_requests_resolution_and_fps_from_config` | ✅ カバー済み |
 | R-CAM-06（stop まで反復） | `CameraRunTest::test_stop_event_exits_loop_and_releases_resources` | ✅ カバー済み |
@@ -20,7 +20,8 @@
 | R-CAM-10（ドロップ→warning） | `CameraRunTest::test_write_failure_warns_per_pool_but_frame_id_advances` | ✅ カバー済み |
 | R-CAM-11（frame_id 単調増加） | `CameraRunTest::test_frames_written_to_both_pools_with_incrementing_frame_id` | ✅ カバー済み |
 | R-CAM-12（finally 後始末） | `CameraRunTest::test_stop_event_exits_loop_and_releases_resources` | ✅ カバー済み |
-| R-CAM-13a〜d（source 型解釈・ルールB） | `ResolveCameraSourceTest`（int/数字文字列/パス・URL） | ✅ カバー済み（`_resolve_camera_source`、実装済み） |
+| R-CAM-13a〜c（source 型解釈・ルールB） | `ResolveCameraSourceTest`（int/数字文字列/パス・URL） | ✅ カバー済み（`_resolve_camera_source`、実装済み） |
+| R-CAM-13d（source 既定値 0） | `ResolveCameraSourceTest::test_default_source_is_device_zero` | ✅ カバー済み |
 | R-CAM-14（open 失敗→GUI 通知） | `CameraRunTest::test_open_failure_reports_error_closes_pools_and_returns` | ✅ カバー済み |
 | R-CAM-15（チャンネル不一致→error+drop） | `FitToPoolTest`（`None` 返却）＋`CameraRunTest::test_channel_mismatch_frame_dropped_without_frame_id_increment`（run の error/continue/frame_id 非加算） | ✅ カバー済み |
 
@@ -33,6 +34,8 @@
 
 ### テスト
 - [x] `tests/test_camera_controller.py` を新設。`_fit_to_pool` の resize（R-CAM-08）／チャンネル不一致 `None`（R-CAM-15）を numpy 配列で検証。
+- [x] `run()` 開始時のロガー構成＋両プールアタッチのテスト（R-CAM-03、`CameraRunTest::test_run_configures_logger_and_attaches_both_pools`）: `Logger` が logging 設定で構成され、`SharedFrameAccessor` が追跡用→GUI 用の両 spec で呼ばれることをモックで検証。
+- [x] `camera.source` 既定値のテスト（R-CAM-13d、`ResolveCameraSourceTest::test_default_source_is_device_zero`）: `CameraConfig()` の `source` が `0`（デバイス0、後方互換）であることを検証。
 - [x] 解像度/FPS 要求のテスト（R-CAM-05、`CameraRunTest::test_requests_resolution_and_fps_from_config`）: open 成功後に `cap.set` へ `CAP_PROP_FRAME_WIDTH`/`CAP_PROP_FRAME_HEIGHT`/`CAP_PROP_FPS` が設定値で渡されることを `FakeCap` の記録で検証。
 - [x] init 状態のテスト（R-CAM-01/02、`InitStateTest`）: `Process` サブクラスであること、生成時に camera/logging 設定・両 spec・`stop_event`・`error_queue` を保持し `frame_id=0`・`logger=None` であることを検証。
 - [x] `run()` 経路を `cv2.VideoCapture` モックで補完（`CameraRunTest`）。
@@ -64,4 +67,4 @@
 - 🔎 両プールは GUI が同一 `frame_shape` で生成するため、`tracking_pool.shape` 基準のリサイズで GUI 用にも適合する（前提が崩れると GUI 用がドロップする）。
 - 🔎 `frame_id` はプロセス生存中のみ単調増加。停止・再開で 0 にリセット（GUI の frame_id 突合に影響＝gui-controller spec で扱う）。
 - 🔎 FPS ペーシングは `cap.read()` 依存（追加 sleep 無し）。
-- ✅ `cv2.VideoCapture`/`SharedFrameAccessor` モックで `run()` 経路（open 失敗・grab 失敗・書き込み・ドロップ・finally）と init 状態（`InitStateTest`）・解像度/FPS 要求（R-CAM-05）を整備済み（計 16 テスト）。残りは子プロセス内アタッチ（R-CAM-03）・source 既定値（R-CAM-13d）のみ。
+- ✅ `cv2.VideoCapture`/`SharedFrameAccessor` モックで `run()` 経路（open 失敗・grab 失敗・書き込み・ドロップ・finally）と init 状態（`InitStateTest`）・解像度/FPS 要求・ロガー構成/アタッチ・source 既定値を整備済み（計 18 テスト）。**全要求（R-CAM-01〜15）がテストカバー済み。**

@@ -31,7 +31,7 @@
 |:--|:--|:--|:--|:--|
 | R-CAM-01 | ユビキタス | システムは `CameraController` を `multiprocessing.Process` のサブクラスとして定義し、独立プロセスで動作させること。 | `src/camera_controller.py:19` | `tests/test_camera_controller.py::InitStateTest::test_subclasses_multiprocessing_process` |
 | R-CAM-02 | イベント駆動 | 生成されたとき、システムは camera 設定・logging 設定・追跡用/GUI 用 spec・`stop_event`・`error_queue` を保持し、`frame_id` を 0 に初期化すること。 | `src/camera_controller.py:20-37` | `tests/test_camera_controller.py::InitStateTest::test_init_keeps_collaborators_and_zeroes_frame_id` |
-| R-CAM-03 | イベント駆動 | `run()` 開始時、システムは**子プロセス内で**ロガーを構成し、2つの `SharedFrameAccessor` をアタッチすること。 | `src/camera_controller.py:79-84` | — |
+| R-CAM-03 | イベント駆動 | `run()` 開始時、システムは**子プロセス内で**ロガーを構成し、2つの `SharedFrameAccessor` をアタッチすること。 | `src/camera_controller.py:79-84` | `tests/test_camera_controller.py::CameraRunTest::test_run_configures_logger_and_attaches_both_pools` |
 | R-CAM-04 | 異常系 | カメラを開けないとき、システムは error をログし、両プールを `close` して `run()` を終了すること。 | `src/camera_controller.py:88-93` | `tests/test_camera_controller.py::CameraRunTest::test_open_failure_reports_error_closes_pools_and_returns` |
 | R-CAM-05 | ユビキタス | システムはカメラへ解像度（width/height）と FPS を設定値で**要求**すること（カメラが従う保証はない）。 | `src/camera_controller.py:95-97` | `tests/test_camera_controller.py::CameraRunTest::test_requests_resolution_and_fps_from_config` |
 | R-CAM-06 | 状態駆動 | `stop_event` がセットされていない間、システムはフレーム取得→書き込みのループを繰り返すこと。 | `src/camera_controller.py:100` | `tests/test_camera_controller.py::CameraRunTest::test_stop_event_exits_loop_and_releases_resources` |
@@ -45,7 +45,7 @@
 | R-CAM-13a | イベント駆動 | `camera.source` が整数のとき、システムはデバイスインデックスとしてそのまま `VideoCapture(int)` に渡すこと。 | `src/camera_controller.py:59-61` | `tests/test_camera_controller.py::ResolveCameraSourceTest::test_int_passes_through_as_device_index` |
 | R-CAM-13b | イベント駆動 | `camera.source` が数字のみの文字列（`[0-9]+`）のとき、システムは int へ変換しデバイスインデックスとして扱うこと。 | `src/camera_controller.py:59-60` | `tests/test_camera_controller.py::ResolveCameraSourceTest::test_digit_string_becomes_int_device_index` |
 | R-CAM-13c | イベント駆動 | `camera.source` がそれ以外の文字列のとき、システムはパス/URL としてそのまま `VideoCapture(str)` に渡すこと。 | `src/camera_controller.py:61` | `tests/test_camera_controller.py::ResolveCameraSourceTest::test_non_digit_string_passes_through_as_path_or_url` |
-| R-CAM-13d | ユビキタス | `camera.source` が未指定のとき、システムは既定値 `0`（デバイス0）を用いること（後方互換）。 | `src/config_manager.py:14-15`（CameraConfig.source 既定） | — |
+| R-CAM-13d | ユビキタス | `camera.source` が未指定のとき、システムは既定値 `0`（デバイス0）を用いること（後方互換）。 | `src/config_manager.py:14-15`（CameraConfig.source 既定） | `tests/test_camera_controller.py::ResolveCameraSourceTest::test_default_source_is_device_zero` |
 | R-CAM-14 | 異常系 | カメラを開けないとき、システムは error をログし、`error_queue` へ `WorkerError(source="camera", message, timestamp)` を送ってから両プールを `close` して `run()` を終了すること（**実装済み**）。 | `src/camera_controller.py:39-49,88-93` | `tests/test_camera_controller.py::CameraRunTest::test_open_failure_reports_error_closes_pools_and_returns` |
 | R-CAM-15 | 異常系 | `cv2.resize` 後もフレームの shape（特にチャンネル数）が期待 shape と一致しないとき、システムは error をログし当該フレームをドロップ（書き込みスキップ＝`continue`、`frame_id` を加算しない）して継続すること（**実装済み**。`_fit_to_pool` が `None` を返した場合）。 | `src/camera_controller.py:63-76,113-120` | `tests/test_camera_controller.py::FitToPoolTest::test_returns_none_for_grayscale_frame`, `::test_returns_none_for_four_channel_frame`, `::CameraRunTest::test_channel_mismatch_frame_dropped_without_frame_id_increment` |
 

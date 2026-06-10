@@ -62,6 +62,12 @@ class ResolveCameraSourceTest(unittest.TestCase):
             "rtsp://host/stream",
         )
 
+    def test_default_source_is_device_zero(self):
+        # R-CAM-13d: camera.source unspecified -> device 0 (backward compat).
+        from config_manager import CameraConfig
+
+        self.assertEqual(CameraConfig().source, 0)
+
 
 class InitStateTest(unittest.TestCase):
     # R-CAM-01/02: Process subclass; the constructor keeps the injected
@@ -198,13 +204,15 @@ class CameraRunTest(unittest.TestCase):
         with mock.patch("camera_controller.Logger") as logger_cls, mock.patch(
             "camera_controller.SharedFrameAccessor",
             side_effect=[self.tracking_pool, self.gui_pool],
-        ), mock.patch(
+        ) as accessor_cls, mock.patch(
             "camera_controller.cv2.VideoCapture", return_value=cap
         ), mock.patch(
             "time.sleep"
         ):
             logger_cls.return_value.get_logger.return_value = self.logger
             ctrl.run()
+        self.logger_cls = logger_cls
+        self.accessor_cls = accessor_cls
 
     def good_frame(self):
         return np.zeros(self.POOL_SHAPE, dtype=np.uint8)
@@ -223,6 +231,24 @@ class CameraRunTest(unittest.TestCase):
         self.assertTrue(self.gui_pool.closed)
         self.assertEqual(self.tracking_pool.writes, [])
         self.assertTrue(any("Failed to open" in m for m in self.logger.messages("error")))
+
+    def test_run_configures_logger_and_attaches_both_pools(self):
+        # R-CAM-03: run() builds the logger from logging_config and
+        # attaches one SharedFrameAccessor per pool spec, tracking first.
+        # (Doing so inside run() is what defers it to the child process.)
+        tracking_spec = object()
+        gui_spec = object()
+        ctrl = self.make_controller(FakeEvent(0))
+        ctrl.tracking_pool_spec = tracking_spec
+        ctrl.gui_pool_spec = gui_spec
+
+        self.run_controller(ctrl, FakeCap())
+
+        self.logger_cls.assert_called_once_with(ctrl.logging_config)
+        self.assertEqual(
+            self.accessor_cls.call_args_list,
+            [mock.call(tracking_spec), mock.call(gui_spec)],
+        )
 
     def test_requests_resolution_and_fps_from_config(self):
         # R-CAM-05: width/height/fps are requested via cap.set (the camera
