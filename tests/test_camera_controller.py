@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -131,12 +132,13 @@ class FakeCap:
         self.opened = opened
         self.reads = list(reads or [])
         self.released = False
+        self.props = {}
 
     def isOpened(self):
         return self.opened
 
     def set(self, prop, value):
-        pass
+        self.props[prop] = value
 
     def read(self):
         if self.reads:
@@ -221,6 +223,18 @@ class CameraRunTest(unittest.TestCase):
         self.assertTrue(self.gui_pool.closed)
         self.assertEqual(self.tracking_pool.writes, [])
         self.assertTrue(any("Failed to open" in m for m in self.logger.messages("error")))
+
+    def test_requests_resolution_and_fps_from_config(self):
+        # R-CAM-05: width/height/fps are requested via cap.set (the camera
+        # is not guaranteed to honor them).
+        ctrl = self.make_controller(FakeEvent(0))
+        cap = FakeCap()
+
+        self.run_controller(ctrl, cap)
+
+        self.assertEqual(cap.props[cv2.CAP_PROP_FRAME_WIDTH], ctrl.config.width)
+        self.assertEqual(cap.props[cv2.CAP_PROP_FRAME_HEIGHT], ctrl.config.height)
+        self.assertEqual(cap.props[cv2.CAP_PROP_FPS], ctrl.config.fps)
 
     def test_frames_written_to_both_pools_with_incrementing_frame_id(self):
         # R-CAM-09/11: each grabbed frame goes to both pools, frame_id +1.

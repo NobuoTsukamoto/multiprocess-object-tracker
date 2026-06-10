@@ -33,7 +33,7 @@
 | R-CAM-02 | イベント駆動 | 生成されたとき、システムは camera 設定・logging 設定・追跡用/GUI 用 spec・`stop_event`・`error_queue` を保持し、`frame_id` を 0 に初期化すること。 | `src/camera_controller.py:20-37` | `tests/test_camera_controller.py::InitStateTest::test_init_keeps_collaborators_and_zeroes_frame_id` |
 | R-CAM-03 | イベント駆動 | `run()` 開始時、システムは**子プロセス内で**ロガーを構成し、2つの `SharedFrameAccessor` をアタッチすること。 | `src/camera_controller.py:79-84` | — |
 | R-CAM-04 | 異常系 | カメラを開けないとき、システムは error をログし、両プールを `close` して `run()` を終了すること。 | `src/camera_controller.py:88-93` | `tests/test_camera_controller.py::CameraRunTest::test_open_failure_reports_error_closes_pools_and_returns` |
-| R-CAM-05 | ユビキタス | システムはカメラへ解像度（width/height）と FPS を設定値で**要求**すること（カメラが従う保証はない）。 | `src/camera_controller.py:95-97` | — |
+| R-CAM-05 | ユビキタス | システムはカメラへ解像度（width/height）と FPS を設定値で**要求**すること（カメラが従う保証はない）。 | `src/camera_controller.py:95-97` | `tests/test_camera_controller.py::CameraRunTest::test_requests_resolution_and_fps_from_config` |
 | R-CAM-06 | 状態駆動 | `stop_event` がセットされていない間、システムはフレーム取得→書き込みのループを繰り返すこと。 | `src/camera_controller.py:100` | `tests/test_camera_controller.py::CameraRunTest::test_stop_event_exits_loop_and_releases_resources` |
 | R-CAM-07 | 異常系 | フレーム取得に失敗（`ret` が False）したとき、システムは warning をログし 0.1 秒スリープして次の反復へ継続すること（**リトライ上限なし＝正式仕様**）。 | `src/camera_controller.py:102-105` | `tests/test_camera_controller.py::CameraRunTest::test_grab_failure_warns_and_continues` |
 | R-CAM-08 | イベント駆動 | 取得フレームの shape が期待 shape と異なるとき、システムは期待 shape（幅・高さ）へ `cv2.resize` すること（`_fit_to_pool` 内）。 | `src/camera_controller.py:63-76,113` | `tests/test_camera_controller.py::FitToPoolTest::test_resizes_when_height_width_differ`, `::test_returns_frame_when_shape_already_matches` |

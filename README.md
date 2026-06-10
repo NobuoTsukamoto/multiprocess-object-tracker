@@ -89,9 +89,9 @@
 | 設定名 | | 説明 |
 |:--|:--|:--|
 | camera | source | カメラソース。int=デバイス番号 / 数字文字列も同様 / それ以外の文字列=動画ファイルパス・RTSP URL（既定 0） |
-|  | fps | カメラのフレームレート |
-|  | width | カメラの画像の幅 |
-|  | height | カメラの画像の高さ |
+|  | fps | カメラのフレームレート（要求値。カメラが従う保証はない） |
+|  | width | カメラの画像の幅（要求値。カメラが従う保証はない） |
+|  | height | カメラの画像の高さ（要求値。カメラが従う保証はない） |
 |  | max_queue_length | カメラのキューの最大数 |
 | detection | model_path | 検出モデルのパス |
 |  | providers | onnxruntimeの実行プロバイダー（例: ['CPUExecutionProvider']） |
