@@ -30,7 +30,7 @@
 |:--|:--|:--|:--|:--|
 | R-DM-01 | ユビキタス | システムは IPC データ構造をすべて `@dataclass` として [`data_models.py`](../../../src/data_models.py) に集約すること。 | `src/data_models.py:11-49` | `tests/test_data_models.py::DataclassAggregationTest` |
 | R-DM-02 | — | **（削除済み）** `FrameData` は未使用のため削除した（実フレームは `FrameRef` + 共有メモリで転送）。 | （削除） | — |
-| R-DM-03 | ユビキタス | システムは `FrameRef` を `frame_id:int` / `timestamp:float` / `slot:int` の3フィールドで定義し、共有メモリスロットへの軽量参照として用いること（画像本体を含めない）。 | `src/data_models.py:11-17` | `tests/test_shared_frame_pool.py:180,215,218`（生成のみ） |
+| R-DM-03 | ユビキタス | システムは `FrameRef` を `frame_id:int` / `timestamp:float` / `slot:int` の3フィールドで定義し、共有メモリスロットへの軽量参照として用いること（画像本体を含めない）。 | `src/data_models.py:11-17` | `tests/test_data_models.py::FrameRefContractTest`、`tests/test_shared_frame_pool.py:180,215,218`（生成） |
 | R-DM-04 | — | **（削除済み）** `DetectionResult` は未使用のため削除した（検出は `sv.Detections` を直接扱う）。 | （削除） | — |
 | R-DM-05 | ユビキタス | システムは `TrackInfo` を `track_id:int` / `class_id:int` の2フィールドで定義すること（box/score は `detections` に一本化し削除済み）。 | `src/data_models.py:20-23` | — |
 | R-DM-06 | ユビキタス | システムは `TrackingResult` を `frame_id:int` / `timestamp:float` / `track_infos:List[TrackInfo]` / `detections:Any` / `process_time_ms:float`（必須）に加え、`queue_latency_ms:float=0.0` / `total_latency_ms:float=0.0`（任意）で定義すること。 | `src/data_models.py:26-36` | — |

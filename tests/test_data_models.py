@@ -34,5 +34,23 @@ class DataclassAggregationTest(unittest.TestCase):
         )
 
 
+class FrameRefContractTest(unittest.TestCase):
+    # R-DM-03: FrameRef is a lightweight slot reference — exactly
+    # frame_id/timestamp/slot, never the image payload itself.
+
+    def test_fields_are_exactly_frame_id_timestamp_slot(self):
+        fields = {f.name: f.type for f in dataclasses.fields(FrameRef)}
+
+        self.assertEqual(
+            fields, {"frame_id": int, "timestamp": float, "slot": int}
+        )
+
+    def test_all_fields_are_required(self):
+        for field in dataclasses.fields(FrameRef):
+            with self.subTest(field=field.name):
+                self.assertIs(field.default, dataclasses.MISSING)
+                self.assertIs(field.default_factory, dataclasses.MISSING)
+
+
 if __name__ == "__main__":
     unittest.main()
