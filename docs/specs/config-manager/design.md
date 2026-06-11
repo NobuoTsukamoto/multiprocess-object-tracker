@@ -93,5 +93,5 @@ flowchart TD
 - `src/config_manager.py:12-97` — 全スキーマ + `EmptyConfigError` + `ConfigManager`
 - `src/main.py:21-43` — 生成・引数・例外ハンドリング
 - `src/camera_controller.py:29` / `src/object_tracking_controller.py:36-38` / `src/gui_controller.py:50-51` — `get_config` 消費
-- `src/logger.py:13-23` — `LoggingConfig`（level/output）消費
+- `src/logger.py:13-15,33,44-45` — `LoggingConfig`（level/output）消費
 - `config/default.yaml:1-45` — 既定設定値（コードのデフォルトと別に YAML 側で上書き）

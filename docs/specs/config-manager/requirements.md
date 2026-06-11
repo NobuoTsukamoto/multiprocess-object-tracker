@@ -67,8 +67,8 @@
 | gui.window_width/height/x/y | 1600/900/100/100 | `gui_controller.py:57-58` | ✅ |
 | gui.display_image_width/height | 1280/720 | `gui_controller.py:667-668` | ✅ |
 | gui.frame_buffer_seconds | 2.0 | `gui_controller.py:118` | ✅ |
-| logging.level | INFO | `logger.py:21` | ✅ |
-| logging.output | console | `logger.py:20` | ✅ |
+| logging.level | INFO | `logger.py:33,45` | ✅ |
+| logging.output | console | `logger.py:44` | ✅ |
 | logging.performance_interval | 100 | `object_tracking_controller.py:260,263` | ✅ |
 
 ## 前提条件 / 不変条件
