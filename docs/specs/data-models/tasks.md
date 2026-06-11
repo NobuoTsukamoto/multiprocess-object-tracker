@@ -4,11 +4,11 @@
 
 ## テストカバレッジ状況（逆生成時）
 
-`data_models` 専用のテストは存在しない。`FrameRef` のみ `test_shared_frame_pool.py` で間接的に生成される（構築のみ、フィールド検証はなし）。
+[`tests/test_data_models.py`](../../../tests/test_data_models.py) が dataclass 集約（R-DM-01）をカバーする。`FrameRef` は `test_shared_frame_pool.py` でも間接的に生成される（構築のみ、フィールド検証はなし）。
 
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
-| R-DM-01 | — | ⬜ 未カバー |
+| R-DM-01 | `DataclassAggregationTest`（全4型が dataclass / モジュール内 dataclass が4型に一致） | ✅ カバー済み |
 | R-DM-02 (`FrameData`) | — | 🗑️ 削除済み |
 | R-DM-03 (`FrameRef`) | `tests/test_shared_frame_pool.py:180,215,218`（生成のみ） | 🟡 部分的（フィールド契約は未検証） |
 | R-DM-04 (`DetectionResult`) | — | 🗑️ 削除済み |
@@ -31,7 +31,8 @@
 - [ ] steering（`structure.md:21,48`）の「IPC データ構造」記述と本 spec のリンクを相互参照。
 
 ### テスト
-- [ ] `tests/test_data_models.py` を新設し、各 dataclass のフィールド/型/デフォルト値（R-DM-05〜07）を検証。
+- [x] dataclass 集約のテスト（R-DM-01、`DataclassAggregationTest`）: `FrameRef`/`TrackInfo`/`TrackingResult`/`WorkerError` がすべて `@dataclass` であり、`data_models` モジュールに定義された dataclass がこの4つに一致する（=集約されている）ことを検証。`tests/test_data_models.py` を新設。
+- [ ] 各 dataclass のフィールド/型/デフォルト値（R-DM-05〜07）の検証を `tests/test_data_models.py` に追加。
 - [ ] レイテンシ2フィールド欠落時の後方互換（`getattr` 既定 `0.0`）を再現するテスト（R-DM-07）。
 
 #### `detections: Any` 維持方針のガードレール（✅必須・優先）
