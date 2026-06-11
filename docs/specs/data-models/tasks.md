@@ -17,17 +17,17 @@
 | R-DM-07 (デフォルト値) | `TrackingResultContractTest::test_latency_fields_default_to_zero` | ✅ カバー済み |
 | R-DM-08 (`detections: Any`) | `TrackingResultContractTest`（`Any` 宣言）、`DetectionsPickleRoundTripTest`（実 `sv.Detections` 格納）、`tests/test_gui_controller.py::RenderImageSmokeTest`（描画経路） | ✅ カバー済み |
 | R-DM-09 (picklability) | `DetectionsPickleRoundTripTest`（TrackInfo/レイテンシ/実 `sv.Detections` 込みの pickle 往復） | ✅ カバー済み |
-| R-DM-10 (レイテンシ定義) | — | ⬜ 未カバー |
-| R-DM-11 (レイテンシ恒等式) | — | ⬜ 未カバー |
-| R-DM-12 (`WorkerError`) | — | ⬜ 未カバー（実装済み・新規） |
+| R-DM-10 (レイテンシ定義) | （定義は `TrackingResult` docstring に明文化済み） | 🟡 部分（算出は `run()` 結線部。otc ループ統合テスト待ち） |
+| R-DM-11 (レイテンシ恒等式) | （恒等式は `TrackingResult` docstring に明文化済み） | 🟡 部分（同上） |
+| R-DM-12 (`WorkerError`) | `WorkerErrorContractTest`（フィールド契約・全フィールド必須・pickle 往復） | ✅ カバー済み |
 
 ## タスク
 
 ### 文書化 / 整合
 - [x] `TrackInfo.box`/`score` を削除したため、box 座標系（xyxy）の論点は `detections`（`sv.Detections.xyxy`）に一本化（対応不要）。
-- [ ] `TrackingResult.detections` が `supervision.Detections` を保持する旨を docstring/型注釈（`"sv.Detections"` 文字列注釈等）で明示。
-- [ ] レイテンシ3値の定義（R-DM-10）と恒等式 `total == queue + process`（R-DM-11）を `TrackingResult` の docstring に明記。
-- [ ] ✅方針確定: `queue_latency_ms` は**リネームせず**、`TrackingResult` の docstring に「撮像→推論開始の入力遅延（共有プール待ち含む）」と定義を明記。
+- [x] `TrackingResult.detections` が `supervision.Detections` を保持する旨を docstring で明示（`data_models.py:30-32`）。
+- [x] レイテンシ3値の定義（R-DM-10）と恒等式 `total == queue + process`（R-DM-11）を `TrackingResult` の docstring に明記（`data_models.py:34-40`）。
+- [x] `queue_latency_ms` は**リネームせず**、`TrackingResult` の docstring に「撮像→推論開始の入力遅延（共有プール待ち含む）」と定義を明記（方針確定どおり実施）。
 - [ ] steering（`structure.md:21,48`）の「IPC データ構造」記述と本 spec のリンクを相互参照。
 
 ### テスト
@@ -62,5 +62,5 @@
 - ✅ レイテンシ2フィールドのデフォルト `0.0` の経緯は確定（コミット `0ded396`）。dataclass 文法制約 + 後方互換。`getattr` 防御は単一バージョン内では実質冗長。
 - ✅ `detections` は **`Any` 型を維持**で確定。ランタイム影響ゼロ・pickle 世代間不整合は同一バージョン往復のため発生しない。実リスクは supervision API 結合のみで「壊れたら追従」方針。前提となるガードレール2本（pickle 往復・描画スモーク）は**整備済み**。
 - ✅ `TrackInfo.box`/`score` は **削除済み（detections に一本化）**。`TrackInfo` は `track_id`/`class_id` の2フィールド。
-- ✅ `queue_latency_ms` は **リネームせず docstring で定義固定** で確定（名前据え置き）。
+- ✅ `queue_latency_ms` は **リネームせず docstring で定義固定** で確定（名前据え置き、**docstring 記載済み**）。
 - 🔎 レイテンシ恒等式 `total == queue + process` が厳密成立（同一時刻基準）。`process_time_ms` のみ `getattr` 非経由で、2値が後付けである確定済み経緯を補強。

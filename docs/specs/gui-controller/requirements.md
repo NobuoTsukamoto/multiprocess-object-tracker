@@ -129,7 +129,7 @@
 
 ## 確定事項（レビュー反映済み）
 
-- ✅ **ワーカーエラーは専用エラーとして GUI に表示（R-GUI-44、実装済み）**: カメラオープン失敗（camera R-CAM-14）・ONNX ロード失敗（tracking R-OTC-23）を `data_models.WorkerError` として専用 `error_queue` で GUI に伝え、状態「エラー」（専用色＋エラー文）で表示する。**機構はステータス Queue に確定**（`multiprocessing.Queue`、無制限）。エラー時は `stop_event` で全停止し、開始ボタンを再有効化して再試行可能にする。出典 `src/gui_controller.py:80-82,490-528,720-724`、`src/data_models.py:39-49`。
+- ✅ **ワーカーエラーは専用エラーとして GUI に表示（R-GUI-44、実装済み）**: カメラオープン失敗（camera R-CAM-14）・ONNX ロード失敗（tracking R-OTC-23）を `data_models.WorkerError` として専用 `error_queue` で GUI に伝え、状態「エラー」（専用色＋エラー文）で表示する。**機構はステータス Queue に確定**（`multiprocessing.Queue`、無制限）。エラー時は `stop_event` で全停止し、開始ボタンを再有効化して再試行可能にする。出典 `src/gui_controller.py:80-82,490-528,720-724`、`src/data_models.py:52-62`。
 - ✅ **「停止失敗」後はアプリ再起動を要する（最低限実装で許容）**: `stop_tracking` は `stop_event.set()` 済みのため停止失敗時に `_update_gui` が再スケジュールされず表示が固まる（`:762-763`）。これは許容とし、リカバリ導線は設けず**アプリ再起動で復帰**する前提とする（最低限の実装）。
 - ✅ **`class_id` 範囲外は無視（R-GUI-45、実装済み）**: 共通ヘルパ `_safe_class_name`（R-GUI-49）で範囲チェックし、追跡リストは当該項目をスキップ、オーバーレイはクラス名を省いて `ID:<tracker_id> (<conf>)` のみ表示する（例外で止めない）。出典 `:577-588,647-665,789-800`。
 

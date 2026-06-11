@@ -94,6 +94,6 @@ flowchart TD
 
 - `src/object_tracking_controller.py:25-279` — 本体
 - `src/shared_frame_pool.py:204-271` — `read`/`read_latest`（[`shared-frame-pool`](../shared-frame-pool/)）
-- `src/data_models.py:20-36` — `TrackInfo`/`TrackingResult`、`:39-49` — `WorkerError`（[`data-models`](../data-models/)）
+- `src/data_models.py:20-49` — `TrackInfo`/`TrackingResult`、`:52-62` — `WorkerError`（[`data-models`](../data-models/)）
 - `src/config_manager.py:22-39` — `DetectionConfig`/`TrackingConfig`
 - `src/gui_controller.py:77-79,386-401` — `track_queue`/`error_queue` 生成・プロセス起動

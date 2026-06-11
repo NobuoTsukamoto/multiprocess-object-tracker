@@ -28,18 +28,18 @@
 
 | ID | 種別 | 要求（EARS） | 出典 | 対応テスト |
 |:--|:--|:--|:--|:--|
-| R-DM-01 | ユビキタス | システムは IPC データ構造をすべて `@dataclass` として [`data_models.py`](../../../src/data_models.py) に集約すること。 | `src/data_models.py:11-49` | `tests/test_data_models.py::DataclassAggregationTest` |
+| R-DM-01 | ユビキタス | システムは IPC データ構造をすべて `@dataclass` として [`data_models.py`](../../../src/data_models.py) に集約すること。 | `src/data_models.py:11-62` | `tests/test_data_models.py::DataclassAggregationTest` |
 | R-DM-02 | — | **（削除済み）** `FrameData` は未使用のため削除した（実フレームは `FrameRef` + 共有メモリで転送）。 | （削除） | — |
 | R-DM-03 | ユビキタス | システムは `FrameRef` を `frame_id:int` / `timestamp:float` / `slot:int` の3フィールドで定義し、共有メモリスロットへの軽量参照として用いること（画像本体を含めない）。 | `src/data_models.py:11-17` | `tests/test_data_models.py::FrameRefContractTest`、`tests/test_shared_frame_pool.py:180,215,218`（生成） |
 | R-DM-04 | — | **（削除済み）** `DetectionResult` は未使用のため削除した（検出は `sv.Detections` を直接扱う）。 | （削除） | — |
 | R-DM-05 | ユビキタス | システムは `TrackInfo` を `track_id:int` / `class_id:int` の2フィールドで定義すること（box/score は `detections` に一本化し削除済み）。 | `src/data_models.py:20-23` | `tests/test_data_models.py::TrackInfoContractTest` |
-| R-DM-06 | ユビキタス | システムは `TrackingResult` を `frame_id:int` / `timestamp:float` / `track_infos:List[TrackInfo]` / `detections:Any` / `process_time_ms:float`（必須）に加え、`queue_latency_ms:float=0.0` / `total_latency_ms:float=0.0`（任意）で定義すること。 | `src/data_models.py:26-36` | `tests/test_data_models.py::TrackingResultContractTest` |
-| R-DM-07 | オプション | `TrackingResult` の `queue_latency_ms` / `total_latency_ms` が与えられない場合、システムは既定値 `0.0` を採用すること。 | `src/data_models.py:35-36` | `tests/test_data_models.py::TrackingResultContractTest::test_latency_fields_default_to_zero` |
-| R-DM-08 | ユビキタス | システムは `TrackingResult.detections` を `Any` 型として宣言し、`supervision.Detections`（推論+追跡後の `tracked_detections`）を格納できるようにすること。 | `src/data_models.py:33` | `tests/test_data_models.py::DetectionsPickleRoundTripTest`、`tests/test_gui_controller.py::RenderImageSmokeTest` |
-| R-DM-09 | ユビキタス | システムは `TrackInfo` と `TrackingResult` の各フィールドを `int`/`float`/`list`/`Any`(sv.Detections) 等の **picklable な値**で構成し、`multiprocessing.Queue` で安全に転送できるようにすること（`track_id`/`class_id` は `int()` キャスト）。 | `src/data_models.py:20-36`、`src/object_tracking_controller.py:234-255` | `tests/test_data_models.py::DetectionsPickleRoundTripTest` |
-| R-DM-10 | ユビキタス | システムは `TrackingResult` のレイテンシ3値を、`queue_latency_ms`=撮像→推論開始（入力遅延）、`process_time_ms`=推論開始→終了、`total_latency_ms`=撮像→終了 として記録すること。 | `src/object_tracking_controller.py:191,244-245,253` | — |
-| R-DM-11 | ユビキタス | システムは3つのレイテンシが恒等式 `total_latency_ms == queue_latency_ms + process_time_ms`（同一時刻基準）を満たすよう算出すること。 | `src/object_tracking_controller.py:191,244-245` | — |
-| R-DM-12 | ユビキタス | システムは `WorkerError` を `source:str`（"camera"/"tracking"）/ `message:str` / `timestamp:float` の3フィールドで定義し、ワーカープロセスが GUI（メインプロセス）へ致命エラーを通知する picklable な値オブジェクトとして用いること。 | `src/data_models.py:39-49` | — |
+| R-DM-06 | ユビキタス | システムは `TrackingResult` を `frame_id:int` / `timestamp:float` / `track_infos:List[TrackInfo]` / `detections:Any` / `process_time_ms:float`（必須）に加え、`queue_latency_ms:float=0.0` / `total_latency_ms:float=0.0`（任意）で定義すること。 | `src/data_models.py:26-49` | `tests/test_data_models.py::TrackingResultContractTest` |
+| R-DM-07 | オプション | `TrackingResult` の `queue_latency_ms` / `total_latency_ms` が与えられない場合、システムは既定値 `0.0` を採用すること。 | `src/data_models.py:48-49` | `tests/test_data_models.py::TrackingResultContractTest::test_latency_fields_default_to_zero` |
+| R-DM-08 | ユビキタス | システムは `TrackingResult.detections` を `Any` 型として宣言し、`supervision.Detections`（推論+追跡後の `tracked_detections`）を格納できるようにすること。 | `src/data_models.py:46` | `tests/test_data_models.py::DetectionsPickleRoundTripTest`、`tests/test_gui_controller.py::RenderImageSmokeTest` |
+| R-DM-09 | ユビキタス | システムは `TrackInfo` と `TrackingResult` の各フィールドを `int`/`float`/`list`/`Any`(sv.Detections) 等の **picklable な値**で構成し、`multiprocessing.Queue` で安全に転送できるようにすること（`track_id`/`class_id` は `int()` キャスト）。 | `src/data_models.py:20-49`、`src/object_tracking_controller.py:234-255` | `tests/test_data_models.py::DetectionsPickleRoundTripTest` |
+| R-DM-10 | ユビキタス | システムは `TrackingResult` のレイテンシ3値を、`queue_latency_ms`=撮像→推論開始（入力遅延）、`process_time_ms`=推論開始→終了、`total_latency_ms`=撮像→終了 として記録すること。 | `src/object_tracking_controller.py:191,244-245,253`、定義は `src/data_models.py:34-40`（docstring） | （定義は docstring 明文化済み。算出の検証は otc ループ統合テスト待ち） |
+| R-DM-11 | ユビキタス | システムは3つのレイテンシが恒等式 `total_latency_ms == queue_latency_ms + process_time_ms`（同一時刻基準）を満たすよう算出すること。 | `src/object_tracking_controller.py:191,244-245`、恒等式は `src/data_models.py:34-36`（docstring） | （恒等式は docstring 明文化済み。算出の検証は otc ループ統合テスト待ち） |
+| R-DM-12 | ユビキタス | システムは `WorkerError` を `source:str`（"camera"/"tracking"）/ `message:str` / `timestamp:float` の3フィールドで定義し、ワーカープロセスが GUI（メインプロセス）へ致命エラーを通知する picklable な値オブジェクトとして用いること。 | `src/data_models.py:52-62` | `tests/test_data_models.py::WorkerErrorContractTest` |
 
 ## 前提条件 / 不変条件
 

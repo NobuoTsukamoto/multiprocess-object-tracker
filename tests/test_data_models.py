@@ -114,6 +114,29 @@ class TrackingResultContractTest(unittest.TestCase):
         self.assertEqual(result.total_latency_ms, 0.0)
 
 
+class WorkerErrorContractTest(unittest.TestCase):
+    # R-DM-12: WorkerError is the fatal-error notification value object —
+    # source/message/timestamp, picklable for the error_queue.
+
+    def test_fields_are_exactly_source_message_timestamp(self):
+        fields = {f.name: f.type for f in dataclasses.fields(WorkerError)}
+
+        self.assertEqual(
+            fields, {"source": str, "message": str, "timestamp": float}
+        )
+
+    def test_all_fields_are_required(self):
+        for field in dataclasses.fields(WorkerError):
+            with self.subTest(field=field.name):
+                self.assertIs(field.default, dataclasses.MISSING)
+                self.assertIs(field.default_factory, dataclasses.MISSING)
+
+    def test_round_trips_through_pickle(self):
+        error = WorkerError(source="camera", message="open failed", timestamp=1.5)
+
+        self.assertEqual(pickle.loads(pickle.dumps(error)), error)
+
+
 class DetectionsPickleRoundTripTest(unittest.TestCase):
     # R-DM-08/09 guardrail: the "detections stays Any, fix-on-upgrade"
     # policy relies on this — a TrackingResult carrying a real

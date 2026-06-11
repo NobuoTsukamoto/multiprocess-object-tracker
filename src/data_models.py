@@ -25,7 +25,20 @@ class TrackInfo:
 
 @dataclass
 class TrackingResult:
-    """Tracking output paired with the frame_id it was computed for."""
+    """Tracking output paired with the frame_id it was computed for.
+
+    detections holds the supervision.Detections returned by ByteTrack
+    (xyxy/confidence/class_id/tracker_id) and crosses the queue as-is
+    via pickle.
+
+    The latency fields are in milliseconds and derive from the same
+    capture/start/end instants, so the identity
+    total_latency_ms == queue_latency_ms + process_time_ms holds:
+    - queue_latency_ms: capture -> inference start (input lag,
+      including the shared-pool wait)
+    - process_time_ms: inference start -> inference end
+    - total_latency_ms: capture -> inference end
+    """
 
     frame_id: int
     timestamp: float
