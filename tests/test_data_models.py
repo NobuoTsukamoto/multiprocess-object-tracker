@@ -1,8 +1,12 @@
 import dataclasses
+import pickle
 import sys
 import unittest
 from pathlib import Path
 from typing import Any, List
+
+import numpy as np
+import supervision as sv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -108,6 +112,46 @@ class TrackingResultContractTest(unittest.TestCase):
 
         self.assertEqual(result.queue_latency_ms, 0.0)
         self.assertEqual(result.total_latency_ms, 0.0)
+
+
+class DetectionsPickleRoundTripTest(unittest.TestCase):
+    # R-DM-08/09 guardrail: the "detections stays Any, fix-on-upgrade"
+    # policy relies on this — a TrackingResult carrying a real
+    # sv.Detections must survive the Queue's pickle round trip with the
+    # attributes the GUI consumes (len / confidence / class_id /
+    # tracker_id) intact. If a supervision upgrade breaks pickling, this
+    # test fails instead of the running app.
+
+    def test_tracking_result_with_real_detections_survives_pickle(self):
+        detections = sv.Detections(
+            xyxy=np.array([[10.0, 10.0, 50.0, 50.0], [60.0, 60.0, 120.0, 130.0]]),
+            confidence=np.array([0.9, 0.75]),
+            class_id=np.array([0, 2]),
+            tracker_id=np.array([1, 2]),
+        )
+        result = TrackingResult(
+            frame_id=7,
+            timestamp=1.5,
+            track_infos=[TrackInfo(track_id=1, class_id=0)],
+            detections=detections,
+            process_time_ms=12.5,
+            queue_latency_ms=3.0,
+            total_latency_ms=15.5,
+        )
+
+        restored = pickle.loads(pickle.dumps(result))
+
+        self.assertEqual(restored.frame_id, 7)
+        self.assertEqual(restored.timestamp, 1.5)
+        self.assertEqual(restored.track_infos, [TrackInfo(track_id=1, class_id=0)])
+        self.assertEqual(restored.process_time_ms, 12.5)
+        self.assertEqual(restored.queue_latency_ms, 3.0)
+        self.assertEqual(restored.total_latency_ms, 15.5)
+        self.assertEqual(len(restored.detections), 2)
+        np.testing.assert_allclose(restored.detections.xyxy, detections.xyxy)
+        np.testing.assert_allclose(restored.detections.confidence, [0.9, 0.75])
+        np.testing.assert_array_equal(restored.detections.class_id, [0, 2])
+        np.testing.assert_array_equal(restored.detections.tracker_id, [1, 2])
 
 
 if __name__ == "__main__":

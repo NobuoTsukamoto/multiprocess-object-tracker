@@ -4,6 +4,10 @@ from collections import OrderedDict
 from pathlib import Path
 from queue import Empty
 from types import SimpleNamespace
+from unittest import mock
+
+import numpy as np
+import supervision as sv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -153,6 +157,63 @@ class GUIControllerTest(unittest.TestCase):
 
         controller.tracking_process = _ProcessStub(alive=False)
         self.assertFalse(controller._workers_alive())
+
+
+class _ImageLabelStub:
+    def __init__(self):
+        self.configured = []
+
+    def winfo_width(self):
+        return 640
+
+    def winfo_height(self):
+        return 480
+
+    def config(self, **kwargs):
+        self.configured.append(kwargs)
+
+
+class RenderImageSmokeTest(unittest.TestCase):
+    # R-DM-08/09 guardrail (data-models spec): the overlay path must keep
+    # working with a real sv.Detections — len / confidence / class_id /
+    # tracker_id access plus re-feeding the object into the supervision
+    # annotators. Only the Tk-dependent PhotoImage step is mocked, so a
+    # supervision upgrade that changes this API fails here, not in the app.
+
+    def test_render_image_with_real_detections(self):
+        controller = object.__new__(GUIController)
+        controller.config_manager = SimpleNamespace(
+            get_config=lambda name: SimpleNamespace(
+                class_names=["person", "bicycle", "car"]
+            )
+        )
+        controller.box_annotator = sv.BoxAnnotator()
+        controller.label_annotator = sv.LabelAnnotator()
+        controller.gui_config = SimpleNamespace(
+            display_image_width=640, display_image_height=480
+        )
+        controller.image_label = _ImageLabelStub()
+        # class_id 99 is out of range for class_names and must take the
+        # "ID only" label branch instead of aborting the render.
+        detections = sv.Detections(
+            xyxy=np.array(
+                [
+                    [10.0, 10.0, 50.0, 50.0],
+                    [60.0, 60.0, 120.0, 130.0],
+                    [200.0, 200.0, 260.0, 280.0],
+                ]
+            ),
+            confidence=np.array([0.9, 0.75, 0.5]),
+            class_id=np.array([0, 2, 99]),
+            tracker_id=np.array([1, 2, 3]),
+        )
+        image = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        with mock.patch("gui_controller.ImageTk") as imagetk:
+            controller._render_image(image, detections)
+
+        imagetk.PhotoImage.assert_called_once()
+        self.assertEqual(len(controller.image_label.configured), 1)
 
 
 if __name__ == "__main__":

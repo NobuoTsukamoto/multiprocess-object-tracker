@@ -47,7 +47,7 @@
 - [x] `error_queue` 受信で「ワーカーの自然死/エラー死」を区別（自然死=stop_event 起因、エラー死=WorkerError 受信）。
 - [ ] **`_handle_worker_error` の直接テスト**（R-GUI-44）: プロセス/プール stub で「stop_event セット・mark_inactive・状態エラー・開始再有効化」を検証（現状は drain 部のみカバー）。
 - [x] **`class_id` 範囲外は無視**（R-GUI-45, R-GUI-49、**完了**）: 共通ヘルパ `_safe_class_name`（`:789-800`）で範囲チェックし、`_drain_track_results`（`:577-588`）は当該項目をスキップ、`_render_image`（`:647-665`）はクラス名を省いて `ID:<tracker_id> (<conf>)` のみ表示。`_safe_class_name` の単体テスト2本を追加。
-- [ ] **描画/リスト経路の直接テスト**（R-GUI-45）: 範囲外 `class_id` を含む追跡結果で Listbox スキップ・ラベル省略を検証（GUI スタブ要）。
+- [ ] **描画/リスト経路の直接テスト**（R-GUI-45）: 範囲外 `class_id` を含む追跡結果で Listbox スキップ・ラベル省略を検証（GUI スタブ要）。描画側のラベル省略分岐は `RenderImageSmokeTest`（data-models ガードレール、`tests/test_gui_controller.py`）で通過済み。Listbox 側が残り。
 
 ### 実装 / 改善（将来）
 - [ ] **「停止失敗」後はアプリ再起動を前提**（R-GUI-22、確定）: 停止失敗時に `_update_gui` が止まる（`stop_event` set 済み）が、リカバリ導線は設けず**最低限の実装**とする。状態「停止失敗」表示と再起動案内（ログ/UI 文言）に留める。出典 `src/gui_controller.py:444-454,762-763`。

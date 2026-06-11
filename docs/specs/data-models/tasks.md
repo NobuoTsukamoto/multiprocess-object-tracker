@@ -15,8 +15,8 @@
 | R-DM-05 (`TrackInfo`、2フィールドへ縮小済み） | `TrackInfoContractTest` | ✅ カバー済み |
 | R-DM-06 (`TrackingResult`) | `TrackingResultContractTest`（フィールド名/型・必須/任意の区分） | ✅ カバー済み |
 | R-DM-07 (デフォルト値) | `TrackingResultContractTest::test_latency_fields_default_to_zero` | ✅ カバー済み |
-| R-DM-08 (`detections: Any`) | `TrackingResultContractTest::test_field_names_and_types`（`Any` 宣言のみ） | 🟡 部分（実 `sv.Detections` 格納は pickle 往復テスト待ち） |
-| R-DM-09 (picklability) | — | ⬜ 未カバー |
+| R-DM-08 (`detections: Any`) | `TrackingResultContractTest`（`Any` 宣言）、`DetectionsPickleRoundTripTest`（実 `sv.Detections` 格納）、`tests/test_gui_controller.py::RenderImageSmokeTest`（描画経路） | ✅ カバー済み |
+| R-DM-09 (picklability) | `DetectionsPickleRoundTripTest`（TrackInfo/レイテンシ/実 `sv.Detections` 込みの pickle 往復） | ✅ カバー済み |
 | R-DM-10 (レイテンシ定義) | — | ⬜ 未カバー |
 | R-DM-11 (レイテンシ恒等式) | — | ⬜ 未カバー |
 | R-DM-12 (`WorkerError`) | — | ⬜ 未カバー（実装済み・新規） |
@@ -39,8 +39,8 @@
 #### `detections: Any` 維持方針のガードレール（✅必須・優先）
 > 「`Any` のまま、supervision バージョンアップ時に直してテストパスで OK」という方針が機能する前提。
 > 下記が無いと描画が壊れても CI がグリーンのまま通る（requirements「確定事項」参照）。
-- [ ] **pickle 往復テスト**: 実 `sv.Detections` を `detections` に入れた `TrackingResult` を pickle→unpickle し、`len()`/`.confidence`/`.class_id`/`.tracker_id` が復元されることを検証（R-DM-08/09）。
-- [ ] **GUI 描画スモークテスト**: 実 `sv.Detections` を `_render_image`（`src/gui_controller.py:644-689`）経路に通し、`.confidence`/`.class_id`/`.tracker_id` 参照と annotator 再投入が成立することを確認。
+- [x] **pickle 往復テスト**（`DetectionsPickleRoundTripTest`）: 実 `sv.Detections` を `detections` に入れた `TrackingResult` を pickle→unpickle し、`len()`/`.xyxy`/`.confidence`/`.class_id`/`.tracker_id` と全フィールドが復元されることを検証（R-DM-08/09）。
+- [x] **GUI 描画スモークテスト**（`tests/test_gui_controller.py::RenderImageSmokeTest`）: 実 `sv.Detections` を `_render_image`（`src/gui_controller.py:644-689`）経路に通し、`.confidence`/`.class_id`/`.tracker_id` 参照と実 annotator（`sv.BoxAnnotator`/`sv.LabelAnnotator`）再投入が成立することを確認。Tk 依存の `ImageTk.PhotoImage` のみモック。範囲外 `class_id` の「ID のみラベル」分岐も通す。
 
 ### 実装 / 改善（将来）
 - [ ] `TrackingResult.detections` の `Any` を見直し（`TYPE_CHECKING` 下での `sv.Detections` 注釈導入）。型安全性と循環依存回避のバランスを検討。
@@ -60,7 +60,7 @@
 - ✅ `FrameData` / `DetectionResult` は **削除済み**（古い実装の残骸）。`import numpy as np` も除去。
 - ✅ `box`/`boxes` 座標系は `xyxy`（削除済みのため、xyxy は `sv.Detections` にのみ残る）。
 - ✅ レイテンシ2フィールドのデフォルト `0.0` の経緯は確定（コミット `0ded396`）。dataclass 文法制約 + 後方互換。`getattr` 防御は単一バージョン内では実質冗長。
-- ✅ `detections` は **`Any` 型を維持**で確定。ランタイム影響ゼロ・pickle 世代間不整合は同一バージョン往復のため発生しない。実リスクは supervision API 結合のみで「壊れたら追従」方針。ただし上記ガードレール2本（pickle 往復・描画スモーク）が方針成立の前提。
+- ✅ `detections` は **`Any` 型を維持**で確定。ランタイム影響ゼロ・pickle 世代間不整合は同一バージョン往復のため発生しない。実リスクは supervision API 結合のみで「壊れたら追従」方針。前提となるガードレール2本（pickle 往復・描画スモーク）は**整備済み**。
 - ✅ `TrackInfo.box`/`score` は **削除済み（detections に一本化）**。`TrackInfo` は `track_id`/`class_id` の2フィールド。
 - ✅ `queue_latency_ms` は **リネームせず docstring で定義固定** で確定（名前据え置き）。
 - 🔎 レイテンシ恒等式 `total == queue + process` が厳密成立（同一時刻基準）。`process_time_ms` のみ `getattr` 非経由で、2値が後付けである確定済み経緯を補強。
