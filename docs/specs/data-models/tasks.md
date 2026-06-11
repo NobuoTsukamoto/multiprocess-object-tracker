@@ -12,10 +12,10 @@
 | R-DM-02 (`FrameData`) | （再導入は `DataclassAggregationTest::test_data_models_defines_exactly_the_ipc_structures` が検出） | 🗑️ 削除済み |
 | R-DM-03 (`FrameRef`) | `FrameRefContractTest`（フィールド契約・全フィールド必須）、`tests/test_shared_frame_pool.py:180,215,218`（生成） | ✅ カバー済み |
 | R-DM-04 (`DetectionResult`) | （再導入は `DataclassAggregationTest::test_data_models_defines_exactly_the_ipc_structures` が検出） | 🗑️ 削除済み |
-| R-DM-05 (`TrackInfo`、2フィールドへ縮小済み） | — | ⬜ 未カバー（実装済み） |
-| R-DM-06 (`TrackingResult`) | — | ⬜ 未カバー |
-| R-DM-07 (デフォルト値) | — | ⬜ 未カバー |
-| R-DM-08 (`detections: Any`) | — | ⬜ 未カバー |
+| R-DM-05 (`TrackInfo`、2フィールドへ縮小済み） | `TrackInfoContractTest` | ✅ カバー済み |
+| R-DM-06 (`TrackingResult`) | `TrackingResultContractTest`（フィールド名/型・必須/任意の区分） | ✅ カバー済み |
+| R-DM-07 (デフォルト値) | `TrackingResultContractTest::test_latency_fields_default_to_zero` | ✅ カバー済み |
+| R-DM-08 (`detections: Any`) | `TrackingResultContractTest::test_field_names_and_types`（`Any` 宣言のみ） | 🟡 部分（実 `sv.Detections` 格納は pickle 往復テスト待ち） |
 | R-DM-09 (picklability) | — | ⬜ 未カバー |
 | R-DM-10 (レイテンシ定義) | — | ⬜ 未カバー |
 | R-DM-11 (レイテンシ恒等式) | — | ⬜ 未カバー |
@@ -33,8 +33,8 @@
 ### テスト
 - [x] dataclass 集約のテスト（R-DM-01、`DataclassAggregationTest`）: `FrameRef`/`TrackInfo`/`TrackingResult`/`WorkerError` がすべて `@dataclass` であり、`data_models` モジュールに定義された dataclass がこの4つに一致する（=集約されている）ことを検証。`tests/test_data_models.py` を新設。
 - [x] `FrameRef` のフィールド契約テスト（R-DM-03、`FrameRefContractTest`）: フィールドが `frame_id:int`/`timestamp:float`/`slot:int` のちょうど3つ（=画像本体を含まない）で、全フィールド必須（デフォルト無し）であることを検証。
-- [ ] 各 dataclass のフィールド/型/デフォルト値（R-DM-05〜07）の検証を `tests/test_data_models.py` に追加。
-- [ ] レイテンシ2フィールド欠落時の後方互換（`getattr` 既定 `0.0`）を再現するテスト（R-DM-07）。
+- [x] 各 dataclass のフィールド/型/デフォルト値（R-DM-05〜07）の検証を `tests/test_data_models.py` に追加（`TrackInfoContractTest`/`TrackingResultContractTest`。5引数構築でレイテンシ2値が `0.0` になることを含む）。
+- [ ] レイテンシ2フィールド欠落時の後方互換（消費側 `getattr` 既定 `0.0`、`gui_controller.py:567-572`）を再現するテスト（R-DM-07 の消費側）。
 
 #### `detections: Any` 維持方針のガードレール（✅必須・優先）
 > 「`Any` のまま、supervision バージョンアップ時に直してテストパスで OK」という方針が機能する前提。

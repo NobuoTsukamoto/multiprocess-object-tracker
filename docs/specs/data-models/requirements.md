@@ -32,9 +32,9 @@
 | R-DM-02 | — | **（削除済み）** `FrameData` は未使用のため削除した（実フレームは `FrameRef` + 共有メモリで転送）。 | （削除） | — |
 | R-DM-03 | ユビキタス | システムは `FrameRef` を `frame_id:int` / `timestamp:float` / `slot:int` の3フィールドで定義し、共有メモリスロットへの軽量参照として用いること（画像本体を含めない）。 | `src/data_models.py:11-17` | `tests/test_data_models.py::FrameRefContractTest`、`tests/test_shared_frame_pool.py:180,215,218`（生成） |
 | R-DM-04 | — | **（削除済み）** `DetectionResult` は未使用のため削除した（検出は `sv.Detections` を直接扱う）。 | （削除） | — |
-| R-DM-05 | ユビキタス | システムは `TrackInfo` を `track_id:int` / `class_id:int` の2フィールドで定義すること（box/score は `detections` に一本化し削除済み）。 | `src/data_models.py:20-23` | — |
-| R-DM-06 | ユビキタス | システムは `TrackingResult` を `frame_id:int` / `timestamp:float` / `track_infos:List[TrackInfo]` / `detections:Any` / `process_time_ms:float`（必須）に加え、`queue_latency_ms:float=0.0` / `total_latency_ms:float=0.0`（任意）で定義すること。 | `src/data_models.py:26-36` | — |
-| R-DM-07 | オプション | `TrackingResult` の `queue_latency_ms` / `total_latency_ms` が与えられない場合、システムは既定値 `0.0` を採用すること。 | `src/data_models.py:35-36` | — |
+| R-DM-05 | ユビキタス | システムは `TrackInfo` を `track_id:int` / `class_id:int` の2フィールドで定義すること（box/score は `detections` に一本化し削除済み）。 | `src/data_models.py:20-23` | `tests/test_data_models.py::TrackInfoContractTest` |
+| R-DM-06 | ユビキタス | システムは `TrackingResult` を `frame_id:int` / `timestamp:float` / `track_infos:List[TrackInfo]` / `detections:Any` / `process_time_ms:float`（必須）に加え、`queue_latency_ms:float=0.0` / `total_latency_ms:float=0.0`（任意）で定義すること。 | `src/data_models.py:26-36` | `tests/test_data_models.py::TrackingResultContractTest` |
+| R-DM-07 | オプション | `TrackingResult` の `queue_latency_ms` / `total_latency_ms` が与えられない場合、システムは既定値 `0.0` を採用すること。 | `src/data_models.py:35-36` | `tests/test_data_models.py::TrackingResultContractTest::test_latency_fields_default_to_zero` |
 | R-DM-08 | ユビキタス | システムは `TrackingResult.detections` を `Any` 型として宣言し、`supervision.Detections`（推論+追跡後の `tracked_detections`）を格納できるようにすること。 | `src/data_models.py:33` | — |
 | R-DM-09 | ユビキタス | システムは `TrackInfo` と `TrackingResult` の各フィールドを `int`/`float`/`list`/`Any`(sv.Detections) 等の **picklable な値**で構成し、`multiprocessing.Queue` で安全に転送できるようにすること（`track_id`/`class_id` は `int()` キャスト）。 | `src/data_models.py:20-36`、`src/object_tracking_controller.py:234-255` | — |
 | R-DM-10 | ユビキタス | システムは `TrackingResult` のレイテンシ3値を、`queue_latency_ms`=撮像→推論開始（入力遅延）、`process_time_ms`=推論開始→終了、`total_latency_ms`=撮像→終了 として記録すること。 | `src/object_tracking_controller.py:191,244-245,253` | — |
