@@ -9,9 +9,9 @@
 | 要求 ID | 対応テスト | 状態 |
 |:--|:--|:--|
 | R-DM-01 | `DataclassAggregationTest`（全4型が dataclass / モジュール内 dataclass が4型に一致） | ✅ カバー済み |
-| R-DM-02 (`FrameData`) | — | 🗑️ 削除済み |
+| R-DM-02 (`FrameData`) | （再導入は `DataclassAggregationTest::test_data_models_defines_exactly_the_ipc_structures` が検出） | 🗑️ 削除済み |
 | R-DM-03 (`FrameRef`) | `tests/test_shared_frame_pool.py:180,215,218`（生成のみ） | 🟡 部分的（フィールド契約は未検証） |
-| R-DM-04 (`DetectionResult`) | — | 🗑️ 削除済み |
+| R-DM-04 (`DetectionResult`) | （再導入は `DataclassAggregationTest::test_data_models_defines_exactly_the_ipc_structures` が検出） | 🗑️ 削除済み |
 | R-DM-05 (`TrackInfo`、2フィールドへ縮小済み） | — | ⬜ 未カバー（実装済み） |
 | R-DM-06 (`TrackingResult`) | — | ⬜ 未カバー |
 | R-DM-07 (デフォルト値) | — | ⬜ 未カバー |
